@@ -1,0 +1,56 @@
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+*.env
+secrets/
+
+# --- Apple signing & push credentials ---
+*.p8
+*.p12
+*.pem
+*.cer
+*.certSigningRequest
+*.mobileprovision
+fcm.json
+GoogleService-Info.plist
+
+# --- Python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# --- Media (user uploads) ---
+media/
+
+# --- Swift / Xcode ---
+frontend/Skhodka/Skhodka.xcodeproj/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+# Keep the XcodeGen project spec (source of truth)
+!frontend/Skhodka/project.yml
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
