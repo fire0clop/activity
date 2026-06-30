@@ -1,0 +1,61 @@
+name: backend-ci
+
+on:
+  push:
+    paths: ["backend/**"]
+  pull_request:
+    paths: ["backend/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: skhodka
+          POSTGRES_PASSWORD: skhodka
+          POSTGRES_DB: skhodka_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U skhodka -d skhodka_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+
+    env:
+      APP_ENV: development
+      APP_SECRET_KEY: ci-secret-0123456789abcdef0123456789abcdef
+      DATABASE_URL: postgresql+asyncpg://skhodka:skhodka@localhost:5432/skhodka_test
+      DB_NULLPOOL: "true"
+      REDIS_URL: redis://localhost:6379/1
+      RATE_LIMIT_ENABLED: "false"
+      STORAGE_BACKEND: local
+      MEDIA_ROOT: /tmp/media
+      MEDIA_PUBLIC_URL: http://localhost:8000/media
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check .
+      - name: Verify migration builds schema on a clean DB
+        env:
+          DATABASE_URL: postgresql+asyncpg://skhodka:skhodka@localhost:5432/skhodka_mig
+        run: |
+          PGPASSWORD=skhodka psql -h localhost -U skhodka -d skhodka_test -c "CREATE DATABASE skhodka_mig" || true
+          alembic upgrade head
+      - name: Run tests
+        run: pytest -q

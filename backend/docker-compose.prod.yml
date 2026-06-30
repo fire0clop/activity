@@ -1,0 +1,68 @@
+# Прод-конфигурация. Запуск:
+#   docker compose -f docker-compose.prod.yml run --rm migrate   # применить миграции
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Перед запуском задайте в окружении (или .env.prod): APP_SECRET_KEY, CORS_ORIGINS,
+# POSTGRES_*, и при STORAGE_BACKEND=s3 — S3_* (см. .env.example). APP_ENV=production
+# включает fail-fast на небезопасных дефолтах (см. app/core/config.validate_for_prod).
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    env_file: .env.prod
+    environment:
+      APP_ENV: production
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    env_file: .env.prod
+    environment:
+      APP_ENV: production
+      AUTO_CREATE_TABLES: "false"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Gunicorn + Uvicorn workers. WS-fan-out идёт через Redis pub/sub, поэтому несколько воркеров безопасны.
+    command: >
+      gunicorn app.main:app
+      --worker-class uvicorn.workers.UvicornWorker
+      --workers ${GUNICORN_WORKERS:-4}
+      --bind 0.0.0.0:8000
+      --access-logfile - --error-logfile -
+      --timeout 60
+
+volumes:
+  pg_data:
