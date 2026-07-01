@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.svg" alt="activity banner" width="100%">
+</p>
+
 # Activity
 
 **Create a "let's do X, looking for company" post in under a minute — and find 2–5 people nearby who want in.**
