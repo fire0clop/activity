@@ -220,7 +220,10 @@ struct EventDetailView: View {
                     switch e.myParticipation?.status {
                     case "accepted":
                         if let cid = e.conversationID {
-                            NavigationLink { ChatView(conversationID: cid, title: e.title) } label: { ctaLabel("Вы участвуете · открыть чат", filled: true) }
+                            NavigationLink {
+                                ChatView(conversationID: cid, title: e.title,
+                                         isArchived: e.status == "finished")
+                            } label: { ctaLabel("Вы участвуете · открыть чат", filled: true) }
                         } else { ctaLabel("Вы участвуете ✓", filled: false) }
                     case "pending": ctaLabel("Заявка отправлена", filled: false)
                     case "waitlisted": ctaLabel("Вы в листе ожидания", filled: false)

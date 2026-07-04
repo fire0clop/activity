@@ -10,6 +10,7 @@ struct PublicProfileView: View {
     @State private var isBlocked = false
     @State private var statusText: String?
     @State private var actionError: String?
+    @State private var loadError: String?
     @State private var fullScreen = false
     @State private var startIndex = 0
     @State private var reviews: [Review] = []
@@ -20,6 +21,12 @@ struct PublicProfileView: View {
                 content(u)
             } else if isLoading {
                 ProgressView().padding(40)
+            } else if let loadError {
+                VStack(spacing: 12) {
+                    Text(loadError).foregroundStyle(.secondary)
+                    Button("Повторить") { Task { await load() } }
+                        .font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
+                }.padding(40)
             } else {
                 Text("Профиль не найден").foregroundStyle(.secondary).padding()
             }
@@ -136,9 +143,15 @@ struct PublicProfileView: View {
     }
 
     private func load() async {
-        isLoading = true
+        isLoading = true; loadError = nil
         defer { isLoading = false }
-        user = try? await auth.api.send(Endpoint(path: "/users/\(userID)"))
+        do {
+            user = try await auth.api.send(Endpoint(path: "/users/\(userID)"))
+        } catch let err as APIError where err.isCode(.notFound) {
+            user = nil   // честный «не найден» — только когда бэк так ответил
+        } catch {
+            loadError = "Не удалось загрузить профиль. Проверьте соединение."
+        }
         if let resp: ReviewsResponse = try? await auth.api.send(Endpoint(path: "/users/\(userID)/reviews")) {
             reviews = resp.items
         }

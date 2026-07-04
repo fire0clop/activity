@@ -4,6 +4,7 @@ import SwiftUI
 struct ChatView: View {
     let conversationID: String
     let title: String
+    var isArchived: Bool = false
     @EnvironmentObject var auth: AuthManager
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var ws = WebSocketClient()
@@ -30,16 +31,22 @@ struct ChatView: View {
                 }
             }
             Divider()
-            HStack {
-                TextField("Сообщение…", text: $draft, axis: .vertical)
-                    .textFieldStyle(.roundedBorder).lineLimit(1...4)
-                Button {
-                    ws.send(text: draft)
-                    draft = ""
-                } label: { Image(systemName: "paperplane.fill") }
-                    .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            if isArchived {
+                Label("Событие завершено — беседа в архиве", systemImage: "archivebox")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).padding(12)
+            } else {
+                HStack {
+                    TextField("Сообщение…", text: $draft, axis: .vertical)
+                        .textFieldStyle(.roundedBorder).lineLimit(1...4)
+                    Button {
+                        ws.send(text: draft)
+                        draft = ""
+                    } label: { Image(systemName: "paperplane.fill") }
+                        .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                .padding(8)
             }
-            .padding(8)
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)

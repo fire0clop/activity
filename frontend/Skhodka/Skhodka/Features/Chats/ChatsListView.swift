@@ -4,6 +4,7 @@ struct ChatsListView: View {
     @EnvironmentObject var auth: AuthManager
     @State private var items: [ConversationListItem] = []
     @State private var isLoading = true
+    @State private var errorText: String?
 
     var body: some View {
         NavigationStack {
@@ -14,12 +15,18 @@ struct ChatsListView: View {
                         Text("Чаты").font(.display(34)).foregroundStyle(Theme.ink).padding(.top, 8)
                         if items.isEmpty && isLoading {
                             ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 60)
+                        } else if let errorText, items.isEmpty {
+                            errorState(errorText)
                         } else if items.isEmpty {
                             emptyState
                         } else {
+                            if let errorText {
+                                Text(errorText).font(.footnote).foregroundStyle(.red)
+                            }
                             ForEach(items) { c in
                                 NavigationLink {
-                                    ChatView(conversationID: c.id, title: c.title ?? "Чат")
+                                    ChatView(conversationID: c.id, title: c.title ?? "Чат",
+                                             isArchived: c.isArchived)
                                 } label: { row(c) }.buttonStyle(.plain)
                             }
                         }
@@ -80,10 +87,26 @@ struct ChatsListView: View {
         .frame(maxWidth: .infinity).padding(.top, 60)
     }
 
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.slash").font(.system(size: 34)).foregroundStyle(Theme.ink2)
+            Text(message).font(.subheadline).foregroundStyle(Theme.ink2).multilineTextAlignment(.center)
+            Button("Повторить") { Task { await load() } }
+                .font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
+        }
+        .frame(maxWidth: .infinity).padding(.top, 60)
+    }
+
     private func load() async {
-        isLoading = true
+        isLoading = true; errorText = nil
         defer { isLoading = false }
-        let resp: ConversationListResponse? = try? await auth.api.send(Endpoint(path: "/conversations"))
-        items = resp?.items ?? []
+        do {
+            let resp: ConversationListResponse = try await auth.api.send(Endpoint(path: "/conversations"))
+            items = resp.items
+        } catch let err as APIError {
+            errorText = err.message      // список не сбрасываем — показываем прошлые данные
+        } catch {
+            errorText = "Не удалось загрузить чаты. Проверьте соединение."
+        }
     }
 }
