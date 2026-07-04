@@ -54,3 +54,7 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Local workspace
+.claude/
+event-app-concept.zip
