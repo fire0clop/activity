@@ -51,6 +51,8 @@ async def _send_sms(phone: str, code: str) -> None:
         logger.warning("[OTP] SMS to %s: code=%s", phone, code)
     elif settings.sms_provider == "smsc":
         await asyncio.to_thread(_send_via_smsc, phone, text)
+    elif settings.sms_provider == "twilio":
+        await asyncio.to_thread(_send_via_twilio, phone, text)
     else:  # pragma: no cover
         raise NotImplementedError(f"SMS provider '{settings.sms_provider}' not implemented")
 
@@ -78,6 +80,30 @@ def _send_via_smsc(phone: str, text: str) -> None:
         logger.warning("[OTP] SMSC error %s: %s", data.get("error_code"), data.get("error"))
         raise AppError("sms_send_failed", "Не удалось отправить SMS", 502)
     logger.info("[OTP] SMSC sent id=%s cnt=%s", data.get("id"), data.get("cnt"))
+
+
+def _send_via_twilio(phone: str, text: str) -> None:
+    """Twilio Messages API. https://www.twilio.com/docs/sms/api/message-resource"""
+    url = (
+        "https://api.twilio.com/2010-04-01/Accounts/"
+        f"{settings.twilio_account_sid}/Messages.json"
+    )
+    try:
+        resp = requests.post(
+            url,
+            data={"To": phone, "From": settings.twilio_from, "Body": text},
+            auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+            timeout=10,
+        )
+        data = resp.json()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("[OTP] Twilio request failed")
+        raise AppError("sms_send_failed", "Не удалось отправить SMS", 502) from exc
+
+    if resp.status_code >= 400:
+        logger.warning("[OTP] Twilio error %s: %s", data.get("code"), data.get("message"))
+        raise AppError("sms_send_failed", "Не удалось отправить SMS", 502)
+    logger.info("[OTP] Twilio sent sid=%s status=%s", data.get("sid"), data.get("status"))
 
 
 async def verify_code(redis: Redis, phone: str, code: str) -> None:

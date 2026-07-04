@@ -39,10 +39,13 @@ class Settings(BaseSettings):
     otp_length: int = 6
     otp_max_attempts: int = 5
     otp_resend_cooldown_sec: int = 60
-    sms_provider: str = "stub"  # stub | smsc
+    sms_provider: str = "stub"  # stub | smsc | twilio
     sms_sender: str = ""        # имя отправителя (опционально; согласуется в кабинете SMSC)
     smsc_login: str = ""
     smsc_password: str = ""
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from: str = ""       # номер/alphanumeric sender id, купленный в Twilio
 
     # Rate limiting (общий лимит на IP по REST-эндпоинтам)
     rate_limit_enabled: bool = True
@@ -108,6 +111,14 @@ class Settings(BaseSettings):
             problems.append("S3 включён, но S3_BUCKET/S3_PUBLIC_URL не заданы")
         if self.auto_create_tables:
             problems.append("AUTO_CREATE_TABLES=true недопустим в проде (используйте Alembic)")
+        if self.sms_provider == "stub":
+            problems.append("SMS_PROVIDER=stub недопустим в проде (smsc или twilio)")
+        elif self.sms_provider == "smsc" and not (self.smsc_login and self.smsc_password):
+            problems.append("SMS_PROVIDER=smsc, но SMSC_LOGIN/SMSC_PASSWORD не заданы")
+        elif self.sms_provider == "twilio" and not (
+            self.twilio_account_sid and self.twilio_auth_token and self.twilio_from
+        ):
+            problems.append("SMS_PROVIDER=twilio, но TWILIO_* не заданы")
         if problems:
             raise RuntimeError("Небезопасная прод-конфигурация: " + "; ".join(problems))
 
