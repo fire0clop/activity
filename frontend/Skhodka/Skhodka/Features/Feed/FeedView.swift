@@ -9,6 +9,7 @@ struct FeedView: View {
     @State private var isMap = false
     @State private var selected: EventListItem?
     @State private var camera: MapCameraPosition = .automatic
+    @State private var showCityPicker = false
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -28,6 +29,16 @@ struct FeedView: View {
             .onReceive(location.$coordinate.compactMap { $0 }) { c in
                 vm.setCoordinate(lat: c.latitude, lng: c.longitude)
                 Task { await vm.refresh() }
+            }
+            .onReceive(location.$denied) { denied in
+                // Геолокация запрещена и город не выбран — предлагаем выбрать вручную.
+                if denied, vm.manualCity == nil { showCityPicker = true }
+            }
+            .sheet(isPresented: $showCityPicker) {
+                CityPickerView(selected: vm.manualCity, locationDenied: location.denied) { city in
+                    vm.selectCity(city)
+                    if city == nil { location.request() }
+                }
             }
         }
     }
@@ -60,8 +71,15 @@ struct FeedView: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("СОБЫТИЯ РЯДОМ").font(.system(size: 12, weight: .heavy)).tracking(1.5)
+                Button { showCityPicker = true } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse").font(.system(size: 11, weight: .heavy))
+                        Text(vm.manualCity?.name.uppercased() ?? "СОБЫТИЯ РЯДОМ")
+                            .font(.system(size: 12, weight: .heavy)).tracking(1.5)
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .heavy))
+                    }
                     .foregroundStyle(Theme.accent)
+                }
                 Text("Чем займёмся?").font(.display(34)).foregroundStyle(Theme.ink)
             }
             Spacer()
