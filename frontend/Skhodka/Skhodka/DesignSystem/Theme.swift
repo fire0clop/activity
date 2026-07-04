@@ -124,6 +124,10 @@ struct RatingView: View {
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink2)
             if count > 0 { Text("(\(count))").font(.caption2).foregroundStyle(Theme.ink2) }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(count > 0
+            ? "Рейтинг \(String(format: "%.1f", value)) из 5, отзывов: \(count)"
+            : "Рейтинга пока нет")
     }
 }
 
@@ -169,6 +173,16 @@ struct StarPicker: View {
                 Image(systemName: i <= rating ? "star.fill" : "star")
                     .font(.title3).foregroundStyle(i <= rating ? Color(red: 0.98, green: 0.7, blue: 0.1) : Theme.line)
                     .onTapGesture { rating = i }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Оценка")
+        .accessibilityValue("\(rating) из 5")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: rating = min(5, rating + 1)
+            case .decrement: rating = max(1, rating - 1)
+            @unknown default: break
             }
         }
     }

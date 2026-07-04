@@ -80,16 +80,20 @@ struct FeedView: View {
                     }
                     .foregroundStyle(Theme.accent)
                 }
+                .accessibilityLabel("Город: \(vm.manualCity?.name ?? "моё местоположение")")
+                .accessibilityHint("Выбрать другой город")
                 Text("Чем займёмся?").font(.display(34)).foregroundStyle(Theme.ink)
             }
             Spacer()
             HStack(spacing: 8) {
                 circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
+                    .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
                 NavigationLink { EventCreateView() } label: {
                     Image(systemName: "plus").font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white).frame(width: 44, height: 44)
                         .background(Theme.accent).clipShape(Circle())
                 }
+                .accessibilityLabel("Создать событие")
             }
         }
     }

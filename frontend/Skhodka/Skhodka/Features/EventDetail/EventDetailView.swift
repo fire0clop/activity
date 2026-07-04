@@ -101,10 +101,17 @@ struct EventDetailView: View {
             // top controls
             HStack {
                 roundIcon("chevron.left") { dismiss() }
+                    .accessibilityLabel("Назад")
                 Spacer()
                 CategoryBadge(category: e.category)
                 Spacer()
-                if e.isOrganizer { roundIcon("pencil") { showEdit = true } } else { roundIcon("ellipsis") { showReport = true } }
+                if e.isOrganizer {
+                    roundIcon("pencil") { showEdit = true }
+                        .accessibilityLabel("Редактировать событие")
+                } else {
+                    roundIcon("ellipsis") { showReport = true }
+                        .accessibilityLabel("Пожаловаться на событие")
+                }
             }
             .padding(.horizontal, 16).padding(.top, 56)
         }

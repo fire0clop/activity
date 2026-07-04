@@ -44,6 +44,7 @@ struct ChatView: View {
                         draft = ""
                     } label: { Image(systemName: "paperplane.fill") }
                         .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .accessibilityLabel("Отправить сообщение")
                 }
                 .padding(8)
             }
@@ -53,6 +54,7 @@ struct ChatView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Circle().fill(ws.connected ? .green : .gray).frame(width: 9, height: 9)
+                    .accessibilityLabel(ws.connected ? "В сети" : "Нет соединения")
             }
         }
         .onAppear {
