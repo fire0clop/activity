@@ -90,9 +90,10 @@ async def test_chat_message_pushes_offline_members(client, user_factory, apns_re
     await client.post(f"/events/{eid}/join", headers=guest["headers"])
     cid = (await client.get(f"/events/{eid}", headers=org["headers"])).json()["conversation_id"]
 
+    import uuid as _uuid
+
     from app.db.session import SessionLocal as SL
     from app.services import chat_service
-    import uuid as _uuid
     async with SL() as db:
         await chat_service.post_message(
             db, _uuid.UUID(cid), "Привет!", sender_id=_uuid.UUID(org["id"]))
