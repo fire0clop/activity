@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Query, status
 from sqlalchemy import select
 
-from app.core.deps import CompleteUser, CurrentUser, DbSession
+from app.core.config import settings
+from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
 from app.core.exceptions import conflict, forbidden, not_found
 from app.models.event import Event
 from app.models.participation import Participation
@@ -12,12 +13,18 @@ from app.models.user import User
 from app.schemas.participation import JoinOut, ParticipantItem, ParticipantsOut
 from app.schemas.user import UserPublic
 from app.services import matching_service, push_service
+from app.services.rate_limit import check_user_action
 
 router = APIRouter(tags=["participations"])
 
 
 @router.post("/events/{event_id}/join", response_model=JoinOut)
-async def join_event(event_id: uuid.UUID, current_user: CompleteUser, db: DbSession) -> JoinOut:
+async def join_event(
+    event_id: uuid.UUID, current_user: CompleteUser, db: DbSession, redis: RedisDep
+) -> JoinOut:
+    await check_user_action(
+        redis, current_user.id, "join_event", settings.user_rl_joins_per_hour, 3600
+    )
     event = await db.get(Event, event_id)
     if event is None:
         raise not_found("Событие не найдено")

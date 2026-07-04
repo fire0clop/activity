@@ -3,15 +3,22 @@ import uuid
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from app.core.deps import CurrentUser, DbSession
+from app.core.config import settings
+from app.core.deps import CurrentUser, DbSession, RedisDep
 from app.models.report import Block, DeviceToken, Report
 from app.schemas.review import DeviceIn, ReportCreateIn, ReportOut
+from app.services.rate_limit import check_user_action
 
 router = APIRouter(tags=["reports"])
 
 
 @router.post("/reports", response_model=ReportOut, status_code=status.HTTP_201_CREATED)
-async def create_report(body: ReportCreateIn, current_user: CurrentUser, db: DbSession) -> ReportOut:
+async def create_report(
+    body: ReportCreateIn, current_user: CurrentUser, db: DbSession, redis: RedisDep
+) -> ReportOut:
+    await check_user_action(
+        redis, current_user.id, "report", settings.user_rl_reports_per_hour, 3600
+    )
     report = Report(
         reporter_id=current_user.id,
         target_user_id=body.target_user_id,

@@ -5,7 +5,8 @@ from fastapi import APIRouter, File, Query, UploadFile, status
 from geoalchemy2 import Geography
 from sqlalchemy import String, cast, func, select
 
-from app.core.deps import CompleteUser, CurrentUser, DbSession
+from app.core.config import settings
+from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
 from app.core.exceptions import forbidden, not_found
 from app.models.conversation import Conversation
 from app.models.event import Event
@@ -23,6 +24,7 @@ from app.schemas.user import UserBrief
 MAX_EVENT_PHOTOS = 5
 from app.services import event_service, matching_service
 from app.services.pagination import decode_cursor, encode_cursor
+from app.services.rate_limit import check_user_action
 from app.services.storage_service import get_storage
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -65,8 +67,13 @@ def _when_range(when: str) -> tuple[datetime, datetime]:
 
 
 @router.post("", response_model=EventDetail, status_code=status.HTTP_201_CREATED)
-async def create_event(body: EventCreateIn, current_user: CompleteUser, db: DbSession) -> EventDetail:
+async def create_event(
+    body: EventCreateIn, current_user: CompleteUser, db: DbSession, redis: RedisDep
+) -> EventDetail:
     from app.core.exceptions import AppError
+    await check_user_action(
+        redis, current_user.id, "create_event", settings.user_rl_events_per_hour, 3600
+    )
     if body.starts_at < datetime.now(UTC):
         raise AppError("validation_error", "Время начала должно быть в будущем", 422)
 

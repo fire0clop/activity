@@ -8,7 +8,9 @@ from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation, ConversationMember
 from app.models.message import Message
+from app.core.config import settings
 from app.services import chat_service
+from app.services.rate_limit import allow_user_action
 from app.ws.manager import manager
 
 router = APIRouter(tags=["chat-ws"])
@@ -73,6 +75,15 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
                 if is_archived:
                     await websocket.send_json(
                         {"type": "error", "code": "forbidden", "detail": "Беседа архивирована"}
+                    )
+                    continue
+                if not await allow_user_action(
+                    websocket.app.state.redis, user_id, "chat_message",
+                    settings.user_rl_messages_per_min, 60,
+                ):
+                    await websocket.send_json(
+                        {"type": "error", "code": "rate_limited",
+                         "detail": "Слишком много сообщений, подождите минуту"}
                     )
                     continue
                 async with SessionLocal() as db2:

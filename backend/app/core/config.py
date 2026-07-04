@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_per_min: int = 120
 
+    # Per-user лимиты на спам-действия (не зависят от IP — не обходятся через VPN)
+    user_rate_limit_enabled: bool = True
+    user_rl_events_per_hour: int = 10       # создание событий
+    user_rl_joins_per_hour: int = 30        # отклики на события
+    user_rl_reports_per_hour: int = 10      # жалобы
+    user_rl_messages_per_min: int = 60      # сообщения в чате (WS)
+
     # Storage
     storage_backend: str = "local"  # local | s3
     media_root: str = "/app/media"
