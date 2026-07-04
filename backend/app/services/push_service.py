@@ -100,7 +100,9 @@ def _send_fcm(token: str, title: str, body: str, data: dict | None) -> tuple[boo
     resp = requests.post(url, json=message, headers={"Authorization": f"Bearer {_fcm_token()}"}, timeout=10)
     if resp.status_code == 200:
         return True, False
-    invalid = resp.status_code in (400, 404) and ("UNREGISTERED" in resp.text or "INVALID_ARGUMENT" in resp.text)
+    invalid = resp.status_code in (400, 404) and (
+        "UNREGISTERED" in resp.text or "INVALID_ARGUMENT" in resp.text
+    )
     logger.warning("[PUSH] FCM error %s: %s", resp.status_code, resp.text[:200])
     return False, invalid
 
@@ -127,7 +129,8 @@ async def send_push(db: AsyncSession, user_id: uuid.UUID, title: str, body: str,
                 ok, bad = await _send_apns(token, title, body, data)
             else:
                 if not fcm_enabled():
-                    logger.info("[PUSH:stub] android user=%s title=%r (FCM не сконфигурирован)", user_id, title)
+                    logger.info("[PUSH:stub] android user=%s title=%r (FCM не сконфигурирован)",
+                                user_id, title)
                     continue
                 ok, bad = await asyncio.to_thread(_send_fcm, token, title, body, data)
             if bad:
