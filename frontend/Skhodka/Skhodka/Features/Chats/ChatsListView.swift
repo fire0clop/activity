@@ -5,6 +5,7 @@ struct ChatsListView: View {
     @State private var items: [ConversationListItem] = []
     @State private var isLoading = true
     @State private var errorText: String?
+    @State private var showCreateGroup = false
 
     var body: some View {
         NavigationStack {
@@ -12,7 +13,18 @@ struct ChatsListView: View {
                 Theme.paper.ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Чаты").font(.display(34)).foregroundStyle(Theme.ink).padding(.top, 8)
+                        HStack {
+                            Text("Чаты").font(.display(34)).foregroundStyle(Theme.ink)
+                            Spacer()
+                            Button { showCreateGroup = true } label: {
+                                Image(systemName: "plus").font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(Theme.ink).frame(width: 44, height: 44)
+                                    .background(Theme.surface).clipShape(Circle())
+                                    .overlay(Circle().stroke(Theme.line, lineWidth: 1))
+                            }
+                            .accessibilityLabel("Создать группу")
+                        }
+                        .padding(.top, 8)
                         if items.isEmpty && isLoading {
                             ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 60)
                         } else if let errorText, items.isEmpty {
@@ -26,7 +38,7 @@ struct ChatsListView: View {
                             ForEach(items) { c in
                                 NavigationLink {
                                     ChatView(conversationID: c.id, title: c.title ?? "Чат",
-                                             isArchived: c.isArchived)
+                                             isArchived: c.isArchived, isGroup: c.type == "group")
                                 } label: { row(c) }.buttonStyle(.plain)
                             }
                         }
@@ -37,6 +49,9 @@ struct ChatsListView: View {
             }
             .navigationBarHidden(true)
             .task { await load() }
+            .sheet(isPresented: $showCreateGroup) {
+                CreateGroupView { _ in Task { await load() } }
+            }
         }
     }
 
@@ -47,6 +62,10 @@ struct ChatsListView: View {
                 if c.type == "event" {
                     Image(systemName: "calendar.circle.fill").font(.system(size: 17))
                         .foregroundStyle(Theme.accent, Theme.surface)
+                        .offset(x: 3, y: 3)
+                } else {
+                    Image(systemName: "person.2.circle.fill").font(.system(size: 17))
+                        .foregroundStyle(Theme.ink2, Theme.surface)
                         .offset(x: 3, y: 3)
                 }
             }

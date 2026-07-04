@@ -5,6 +5,7 @@ struct ChatView: View {
     let conversationID: String
     let title: String
     var isArchived: Bool = false
+    var isGroup: Bool = false
     @EnvironmentObject var auth: AuthManager
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var ws = WebSocketClient()
@@ -53,8 +54,16 @@ struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Circle().fill(ws.connected ? .green : .gray).frame(width: 9, height: 9)
-                    .accessibilityLabel(ws.connected ? "В сети" : "Нет соединения")
+                HStack(spacing: 10) {
+                    Circle().fill(ws.connected ? .green : .gray).frame(width: 9, height: 9)
+                        .accessibilityLabel(ws.connected ? "В сети" : "Нет соединения")
+                    if isGroup {
+                        NavigationLink { GroupInfoView(conversationID: conversationID) } label: {
+                            Image(systemName: "info.circle")
+                        }
+                        .accessibilityLabel("О группе")
+                    }
+                }
             }
         }
         .onAppear {
