@@ -26,3 +26,21 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Skhodka/Skhodka.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+  SkhodkaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - SkhodkaTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Skhodka
+schemes:
+  Skhodka:
+    build:
+      targets:
+        Skhodka: all
+    test:
+      targets:
+        - SkhodkaTests
