@@ -8,9 +8,10 @@ IP="$(ipconfig getifaddr en0 || true)"
 if [ -z "$IP" ]; then echo "Не удалось определить IP"; exit 1; fi
 echo "Текущий IP: $IP"
 
-# 1) Приложение — только строка device-host (симулятор остаётся на localhost)
-sed -i '' "s#static let host = \".*\" // device-host#static let host = \"$IP:8080\" // device-host#" \
-  "$ROOT/frontend/Skhodka/Skhodka/Config/AppConfig.swift"
+# 1) Приложение — строка API_HOST для устройства в Dev.xcconfig
+#    (строка API_HOST[sdk=iphonesimulator*] не трогается — симулятор остаётся на localhost)
+sed -i '' "s#^API_HOST = .*#API_HOST = $IP:8080#" \
+  "$ROOT/frontend/Skhodka/Configs/Dev.xcconfig"
 
 # 2) Бэкенд (MEDIA_PUBLIC_URL в .env) + перезапуск
 sed -i '' "s#^MEDIA_PUBLIC_URL=.*#MEDIA_PUBLIC_URL=http://$IP:8080/media#" "$ROOT/backend/.env"

@@ -1,0 +1,9 @@
+// Dev-окружение (Debug-сборки).
+// Симулятор ходит на Mac через localhost; реальный телефон — по LAN-IP Mac'а.
+// LAN-IP обновляется командой ./setip.sh при смене Wi-Fi.
+
+API_SCHEME = http
+WS_SCHEME = ws
+
+API_HOST = 192.168.50.63:8080
+API_HOST[sdk=iphonesimulator*] = localhost:8080

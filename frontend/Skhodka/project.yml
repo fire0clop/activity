@@ -14,6 +14,9 @@ targets:
   Skhodka:
     type: application
     platform: iOS
+    configFiles:
+      Debug: Configs/Dev.xcconfig
+      Release: Configs/Prod.xcconfig
     sources:
       - Skhodka
     settings:

@@ -1,0 +1,6 @@
+// Прод-окружение (Release-сборки). Заполнить реальным доменом перед TestFlight.
+
+API_SCHEME = https
+WS_SCHEME = wss
+
+API_HOST = api.skhodka.example
