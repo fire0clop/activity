@@ -119,6 +119,14 @@ async def create_event(
     await db.commit()
     await db.refresh(event)
 
+    # Пуш подписчикам на категорию/район; сбой рассылки не ломает создание.
+    try:
+        from app.services.subscription_service import notify_subscribers
+        await notify_subscribers(db, event)
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger("subscriptions").exception("notify failed for event %s", event.id)
+
     return event_service.build_detail(
         event, current_user, viewer_id=current_user.id, my_status="accepted",
         participants_current=1, distance_km=0.0, conversation_id=None,

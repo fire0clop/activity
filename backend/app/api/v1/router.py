@@ -11,6 +11,7 @@ from app.api.v1 import (
     participations,
     reports,
     reviews,
+    subscriptions,
     users,
 )
 from app.core.deps import DbSession, RedisDep
@@ -45,4 +46,5 @@ api_router.include_router(participations.router)
 api_router.include_router(conversations.router)
 api_router.include_router(reviews.router)
 api_router.include_router(reports.router)
+api_router.include_router(subscriptions.router)
 api_router.include_router(chat.router)  # WebSocket /ws/chat/{conversation_id}

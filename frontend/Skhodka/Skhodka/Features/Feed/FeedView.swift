@@ -10,6 +10,7 @@ struct FeedView: View {
     @State private var selected: EventListItem?
     @State private var camera: MapCameraPosition = .automatic
     @State private var showCityPicker = false
+    @State private var showSubscriptions = false
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -33,6 +34,10 @@ struct FeedView: View {
             .onReceive(location.$denied) { denied in
                 // Геолокация запрещена и город не выбран — предлагаем выбрать вручную.
                 if denied, vm.manualCity == nil { showCityPicker = true }
+            }
+            .sheet(isPresented: $showSubscriptions) {
+                SubscriptionsView(latitude: vm.latitude, longitude: vm.longitude,
+                                  locationName: vm.manualCity?.name ?? "моя точка")
             }
             .sheet(isPresented: $showCityPicker) {
                 CityPickerView(selected: vm.manualCity, locationDenied: location.denied) { city in
@@ -86,6 +91,8 @@ struct FeedView: View {
             }
             Spacer()
             HStack(spacing: 8) {
+                circleButton("bell") { showSubscriptions = true }
+                    .accessibilityLabel("Подписки на события")
                 circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
                     .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
                 NavigationLink { EventCreateView() } label: {

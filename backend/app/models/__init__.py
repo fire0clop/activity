@@ -6,6 +6,7 @@ from app.models.message import Message
 from app.models.participation import Participation
 from app.models.report import Block, DeviceToken, Report
 from app.models.review import Review
+from app.models.subscription import Subscription
 from app.models.user import RefreshToken, User
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "ConversationMember",
     "Message",
     "Review",
+    "Subscription",
     "Report",
     "Block",
     "DeviceToken",
