@@ -80,6 +80,29 @@ async def test_reject_triggers_push(client, user_factory, apns_recorder) -> None
 
 
 @pytest.mark.asyncio
+async def test_chat_message_pushes_offline_members(client, user_factory, apns_recorder) -> None:
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    await client.post("/devices", headers=guest["headers"],
+                      json={"token": "tok-guest", "platform": "ios"})
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=3))).json()["id"]
+    await client.post(f"/events/{eid}/join", headers=guest["headers"])
+    cid = (await client.get(f"/events/{eid}", headers=org["headers"])).json()["conversation_id"]
+
+    from app.db.session import SessionLocal as SL
+    from app.services import chat_service
+    import uuid as _uuid
+    async with SL() as db:
+        await chat_service.post_message(
+            db, _uuid.UUID(cid), "Привет!", sender_id=_uuid.UUID(org["id"]))
+
+    got = [p for p in apns_recorder if p["token"] == "tok-guest"
+           and p["data"].get("conversation_id") == cid]
+    assert got and "Привет!" in got[-1]["body"]
+
+
+@pytest.mark.asyncio
 async def test_invalid_token_pruned(client, user_factory, monkeypatch) -> None:
     async def dead_token(token, title, body, data):
         return False, True  # (ok, token_invalid)

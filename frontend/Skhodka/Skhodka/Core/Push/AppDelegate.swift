@@ -26,10 +26,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         completionHandler([.banner, .sound, .badge])
     }
 
-    // Нажатие на уведомление (deep-link можно добавить позже через данные payload).
+    // Нажатие на уведомление — deep-link по данным payload (event_id / conversation_id).
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
+        PushCenter.shared.open(userInfo: response.notification.request.content.userInfo)
         completionHandler()
     }
 }

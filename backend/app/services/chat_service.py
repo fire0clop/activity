@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from sqlalchemy import func, select
@@ -10,6 +11,8 @@ from app.models.user import User
 from app.schemas.message import MessageOut
 from app.schemas.user import UserPublic
 from app.ws.manager import manager
+
+logger = logging.getLogger("chat")
 
 
 async def get_or_create_event_conversation(db: AsyncSession, event: Event) -> Conversation:
@@ -116,4 +119,42 @@ async def post_message(
         conversation_id,
         {"type": "system" if is_system else "message", "message": out.model_dump(mode="json")},
     )
+    if not is_system and sender_id is not None:
+        try:
+            await _notify_offline_members(conversation_id, sender_id, out)
+        except Exception:  # noqa: BLE001 - сбой пуша не должен ломать отправку сообщения
+            logger.exception("chat: offline push failed")
     return out
+
+
+async def _notify_offline_members(
+    conversation_id: uuid.UUID, sender_id: uuid.UUID, msg: MessageOut
+) -> None:
+    """Пуш о новом сообщении тем участникам, кто сейчас не в чате (deep-link по conversation_id).
+
+    Работает в СВОЕЙ короткоживущей сессии: нельзя растягивать транзакцию
+    сессии-отправителя на время рассылки (висящая 'idle in transaction'
+    блокирует DDL и чужие запросы).
+    """
+    from app.db.session import SessionLocal
+    from app.services import push_service
+
+    online = set(await manager.online_user_ids(conversation_id))
+    sender_name = msg.sender.name if msg.sender else "Кто-то"
+    async with SessionLocal() as db:
+        member_ids = (
+            await db.execute(
+                select(ConversationMember.user_id).where(
+                    ConversationMember.conversation_id == conversation_id
+                )
+            )
+        ).scalars().all()
+        conv = await db.get(Conversation, conversation_id)
+        title = (conv.title if conv else None) or "Новое сообщение"
+        for uid in member_ids:
+            if uid == sender_id or str(uid) in online:
+                continue
+            await push_service.send_push(
+                db, uid, title, f"{sender_name}: {msg.text[:120]}",
+                {"conversation_id": str(conversation_id)},
+            )

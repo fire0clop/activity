@@ -26,6 +26,12 @@ async def _clean_state() -> AsyncGenerator[None, None]:
 
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+        # Добиваем чужие соединения к тестовой БД: утёкшая 'idle in transaction'
+        # сессия из аварийно завершённого теста иначе вешает drop_all навсегда.
+        await conn.execute(text(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE datname = current_database() AND pid <> pg_backend_pid()"
+        ))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     # Чистим Redis (OTP-кулдауны, rate-limit, presence), чтобы тесты не влияли друг на друга.

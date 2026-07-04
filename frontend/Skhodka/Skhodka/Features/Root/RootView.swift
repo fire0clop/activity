@@ -24,6 +24,8 @@ struct RootView: View {
 
 /// Основная навигация после входа.
 struct MainTabView: View {
+    @ObservedObject private var push = PushCenter.shared
+
     init() {
         // «Бумажный» таб-бар вместо системного.
         let a = UITabBarAppearance()
@@ -44,5 +46,16 @@ struct MainTabView: View {
                 .tabItem { Label("Профиль", systemImage: "person.fill") }
         }
         .tint(Theme.accent)
+        // Deep-link из нажатого пуша: событие или чат поверх текущего таба.
+        .sheet(item: $push.pendingRoute) { route in
+            NavigationStack {
+                switch route {
+                case .event(let id):
+                    EventDetailView(eventID: id)
+                case .conversation(let id):
+                    ChatView(conversationID: id, title: "Чат")
+                }
+            }
+        }
     }
 }
