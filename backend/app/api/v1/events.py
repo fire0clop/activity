@@ -20,12 +20,12 @@ from app.schemas.event import (
     PhotosOut,
 )
 from app.schemas.user import UserBrief
-
-MAX_EVENT_PHOTOS = 5
 from app.services import event_service, matching_service
 from app.services.pagination import decode_cursor, encode_cursor
 from app.services.rate_limit import check_user_action
 from app.services.storage_service import get_storage
+
+MAX_EVENT_PHOTOS = 5
 
 router = APIRouter(prefix="/events", tags=["events"])
 

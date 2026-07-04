@@ -4,11 +4,11 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, update
 
+from app.core.config import settings
 from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation, ConversationMember
 from app.models.message import Message
-from app.core.config import settings
 from app.services import chat_service
 from app.services.rate_limit import allow_user_action
 from app.ws.manager import manager
