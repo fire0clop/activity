@@ -5,14 +5,20 @@ struct ChatView: View {
     let conversationID: String
     let title: String
     @EnvironmentObject var auth: AuthManager
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var ws = WebSocketClient()
     @State private var draft = ""
+    @State private var historyError: String?
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
+                        if let historyError, ws.messages.isEmpty {
+                            Text(historyError).font(.caption).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center).padding(.top, 24)
+                        }
                         ForEach(ws.messages) { m in bubble(m).id(m.id) }
                     }
                     .padding()
@@ -43,11 +49,29 @@ struct ChatView: View {
             }
         }
         .onAppear {
-            if let token = auth.tokenStore.accessToken {
-                ws.connect(conversationID: conversationID, token: token)
+            ws.connect(conversationID: conversationID) { [weak auth] in
+                await auth?.api.validAccessToken()
             }
         }
+        .task { await loadHistoryFallback() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { ws.ensureConnected() }
+        }
         .onDisappear { ws.disconnect() }
+    }
+
+    /// Подстраховка: если WS не поднялся и history не пришла — тянем её по REST.
+    private func loadHistoryFallback() async {
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        guard ws.messages.isEmpty, !Task.isCancelled else { return }
+        do {
+            let resp: MessagesResponse = try await auth.api.send(
+                Endpoint(path: "/conversations/\(conversationID)/messages"))
+            // REST отдаёт newest-first; на экране — старые сверху.
+            if ws.messages.isEmpty { ws.messages = resp.items.reversed() }
+        } catch {
+            if ws.messages.isEmpty { historyError = "Не удалось загрузить историю. Проверьте соединение." }
+        }
     }
 
     @ViewBuilder

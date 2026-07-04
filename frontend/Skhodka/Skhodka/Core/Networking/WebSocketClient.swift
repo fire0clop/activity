@@ -8,7 +8,8 @@ final class WebSocketClient: NSObject, ObservableObject {
 
     private var task: URLSessionWebSocketTask?
     private var conversationID = ""
-    private var token = ""
+    /// Отдаёт свежий access-токен (с refresh при необходимости) перед каждым коннектом.
+    private var tokenProvider: () async -> String? = { nil }
     private var intentionalClose = false
     private let decoder = JSONDecoder()
 
@@ -23,14 +24,25 @@ final class WebSocketClient: NSObject, ObservableObject {
         }
     }
 
-    func connect(conversationID: String, token: String) {
+    func connect(conversationID: String, tokenProvider: @escaping () async -> String?) {
         self.conversationID = conversationID
-        self.token = token
+        self.tokenProvider = tokenProvider
         intentionalClose = false
-        openSocket()
+        Task { await openSocket() }
     }
 
-    private func openSocket() {
+    /// Переоткрывает сокет, если он не активен (обрыв, возврат приложения из фона).
+    func ensureConnected() {
+        guard !intentionalClose, !connected else { return }
+        task?.cancel(with: .goingAway, reason: nil)
+        Task { await openSocket() }
+    }
+
+    private func openSocket() async {
+        guard let token = await tokenProvider() else {
+            await MainActor.run { self.connected = false }
+            return
+        }
         let url = AppConfig.wsBaseURL
             .appendingPathComponent("ws/chat/\(conversationID)")
         var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)!
@@ -38,7 +50,6 @@ final class WebSocketClient: NSObject, ObservableObject {
         let task = URLSession.shared.webSocketTask(with: comps.url!)
         self.task = task
         task.resume()
-        DispatchQueue.main.async { self.connected = true }
         receive()
     }
 
@@ -62,6 +73,8 @@ final class WebSocketClient: NSObject, ObservableObject {
             guard let self else { return }
             switch result {
             case .success(let msg):
+                // Сервер сразу шлёт history — первый кадр и означает «подключены».
+                DispatchQueue.main.async { if !self.connected { self.connected = true } }
                 if case .string(let text) = msg { self.handle(text) }
                 self.receive()
             case .failure:
@@ -90,9 +103,10 @@ final class WebSocketClient: NSObject, ObservableObject {
 
     private func reconnectIfNeeded() {
         guard !intentionalClose else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard let self, !self.intentionalClose else { return }
-            self.openSocket()
+            await self.openSocket()
         }
     }
 }

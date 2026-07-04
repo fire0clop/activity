@@ -127,6 +127,27 @@ final class APIClient {
         }
     }
 
+    /// Актуальный access-токен (для WebSocket): если текущий истёк или вот-вот
+    /// истечёт — сначала обновляет пару через /auth/refresh.
+    func validAccessToken() async -> String? {
+        if let token = tokenStore.accessToken, !Self.isExpiringSoon(token) { return token }
+        return await refresh() ? tokenStore.accessToken : nil
+    }
+
+    /// Читает exp из payload JWT без проверки подписи — только чтобы решить, пора ли обновлять.
+    private static func isExpiringSoon(_ jwt: String, leeway: TimeInterval = 30) -> Bool {
+        let parts = jwt.split(separator: ".")
+        guard parts.count == 3 else { return false }
+        var b64 = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64 += "=" }
+        guard let data = Data(base64Encoded: b64),
+              let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let exp = payload["exp"] as? TimeInterval else { return false }
+        return Date(timeIntervalSince1970: exp).timeIntervalSinceNow < leeway
+    }
+
     /// Обновление токена. true — успех.
     private func refresh() async -> Bool {
         guard let refreshToken = tokenStore.refreshToken else { return false }
