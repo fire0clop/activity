@@ -6,7 +6,10 @@ struct PublicProfileView: View {
     @State private var user: UserPublic?
     @State private var isLoading = true
     @State private var showReport = false
+    @State private var showBlockConfirm = false
+    @State private var isBlocked = false
     @State private var statusText: String?
+    @State private var actionError: String?
     @State private var fullScreen = false
     @State private var startIndex = 0
     @State private var reviews: [Review] = []
@@ -33,6 +36,12 @@ struct PublicProfileView: View {
             Button("Безопасность") { Task { await report("safety") } }
             Button("Другое") { Task { await report("other") } }
             Button("Отмена", role: .cancel) {}
+        }
+        .confirmationDialog("Заблокировать пользователя?", isPresented: $showBlockConfirm, titleVisibility: .visible) {
+            Button("Заблокировать", role: .destructive) { Task { await setBlocked(true) } }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Вы перестанете видеть события этого пользователя, а он не сможет откликаться на ваши.")
         }
     }
 
@@ -88,14 +97,23 @@ struct PublicProfileView: View {
             if let statusText {
                 Text(statusText).font(.footnote).foregroundStyle(.secondary)
             }
+            if let actionError {
+                Text(actionError).font(.footnote).foregroundStyle(.red)
+            }
 
             if u.id != auth.me?.id {
                 VStack(spacing: 10) {
                     Button(role: .destructive) { showReport = true } label: {
                         Label("Пожаловаться", systemImage: "exclamationmark.bubble")
                     }
-                    Button(role: .destructive) { Task { await block() } } label: {
-                        Label("Заблокировать", systemImage: "hand.raised")
+                    if isBlocked {
+                        Button { Task { await setBlocked(false) } } label: {
+                            Label("Разблокировать", systemImage: "hand.raised.slash")
+                        }
+                    } else {
+                        Button(role: .destructive) { showBlockConfirm = true } label: {
+                            Label("Заблокировать", systemImage: "hand.raised")
+                        }
                     }
                 }.padding(.top, 8)
             }
@@ -127,14 +145,30 @@ struct PublicProfileView: View {
     }
 
     private func report(_ reason: String) async {
-        try? await auth.api.sendVoid(Endpoint(
-            path: "/reports", method: .post,
-            body: ReportBody(target_user_id: userID, target_event_id: nil, reason: reason, comment: nil)))
-        statusText = "Жалоба отправлена. Спасибо."
+        statusText = nil; actionError = nil
+        do {
+            try await auth.api.sendVoid(Endpoint(
+                path: "/reports", method: .post,
+                body: ReportBody(target_user_id: userID, target_event_id: nil, reason: reason, comment: nil)))
+            statusText = "Жалоба отправлена. Спасибо."
+        } catch let err as APIError {
+            actionError = err.message
+        } catch {
+            actionError = "Не удалось отправить жалобу. Проверьте соединение."
+        }
     }
 
-    private func block() async {
-        try? await auth.api.sendVoid(Endpoint(path: "/users/\(userID)/block", method: .post))
-        statusText = "Пользователь заблокирован."
+    private func setBlocked(_ blocked: Bool) async {
+        statusText = nil; actionError = nil
+        do {
+            try await auth.api.sendVoid(Endpoint(
+                path: "/users/\(userID)/block", method: blocked ? .post : .delete))
+            isBlocked = blocked
+            statusText = blocked ? "Пользователь заблокирован." : "Пользователь разблокирован."
+        } catch let err as APIError {
+            actionError = err.message
+        } catch {
+            actionError = "Не удалось выполнить действие. Проверьте соединение."
+        }
     }
 }

@@ -10,6 +10,8 @@ struct EventDetailView: View {
     @State private var actionLoading = false
     @State private var errorText: String?
     @State private var showEdit = false
+    @State private var showReport = false
+    @State private var reportStatus: String?
     @State private var photoPage = 0
     @State private var fullScreen = false
 
@@ -34,6 +36,13 @@ struct EventDetailView: View {
             FullScreenPhotoView(images: event?.images ?? [], start: photoPage)
         }
         .task { await load() }
+        .confirmationDialog("Пожаловаться на событие", isPresented: $showReport, titleVisibility: .visible) {
+            Button("Спам") { Task { await report("spam") } }
+            Button("Неуместное содержание") { Task { await report("inappropriate") } }
+            Button("Безопасность") { Task { await report("safety") } }
+            Button("Другое") { Task { await report("other") } }
+            Button("Отмена", role: .cancel) {}
+        }
     }
 
     @ViewBuilder
@@ -51,6 +60,7 @@ struct EventDetailView: View {
                     Text(d).font(.system(size: 16)).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(3)
                 }
                 if let errorText { Text(errorText).font(.footnote).foregroundStyle(.red) }
+                if let reportStatus { Text(reportStatus).font(.footnote).foregroundStyle(Theme.ink2) }
                 if e.status == "finished", e.isOrganizer || e.myParticipation?.status == "accepted" {
                     NavigationLink { ReviewView(event: e) } label: {
                         Label("Оставить отзывы", systemImage: "star.bubble").font(.system(size: 15, weight: .semibold))
@@ -94,7 +104,7 @@ struct EventDetailView: View {
                 Spacer()
                 CategoryBadge(category: e.category)
                 Spacer()
-                if e.isOrganizer { roundIcon("pencil") { showEdit = true } } else { Color.clear.frame(width: 40, height: 40) }
+                if e.isOrganizer { roundIcon("pencil") { showEdit = true } } else { roundIcon("ellipsis") { showReport = true } }
             }
             .padding(.horizontal, 16).padding(.top, 56)
         }
@@ -239,6 +249,20 @@ struct EventDetailView: View {
         isLoading = true; defer { isLoading = false }
         do { event = try await auth.api.send(Endpoint(path: "/events/\(eventID)")) }
         catch let err as APIError { errorText = err.message } catch { errorText = "Ошибка загрузки" }
+    }
+
+    private func report(_ reason: String) async {
+        reportStatus = nil; errorText = nil
+        do {
+            try await auth.api.sendVoid(Endpoint(
+                path: "/reports", method: .post,
+                body: ReportBody(target_user_id: nil, target_event_id: eventID, reason: reason, comment: nil)))
+            reportStatus = "Жалоба отправлена. Спасибо."
+        } catch let err as APIError {
+            errorText = err.message
+        } catch {
+            errorText = "Не удалось отправить жалобу. Проверьте соединение."
+        }
     }
 
     private func join() async {
