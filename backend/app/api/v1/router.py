@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
@@ -13,6 +15,8 @@ from app.api.v1 import (
 )
 from app.core.deps import DbSession, RedisDep
 
+logger = logging.getLogger("health")
+
 api_router = APIRouter()
 
 
@@ -24,12 +28,12 @@ async def health(db: DbSession, redis: RedisDep) -> dict:
         await db.execute(text("SELECT 1"))
         checks["db"] = True
     except Exception:  # noqa: BLE001
-        pass
+        logger.warning("health: db check failed", exc_info=True)
     try:
         await redis.ping()
         checks["redis"] = True
     except Exception:  # noqa: BLE001
-        pass
+        logger.warning("health: redis check failed", exc_info=True)
     ok = all(checks.values())
     return {"status": "ok" if ok else "degraded", "checks": checks}
 

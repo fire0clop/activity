@@ -9,7 +9,7 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKey
 class Conversation(Base, UUIDPrimaryKey, TimestampMixin):
     __tablename__ = "conversations"
 
-    # type: event | group
+    # вид беседы: event | group
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     event_id: Mapped[uuid.UUID | None] = mapped_column(

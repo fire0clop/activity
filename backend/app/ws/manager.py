@@ -46,7 +46,7 @@ class ConnectionManager:
                 await self._pubsub.unsubscribe(_CHANNEL)
                 await self._pubsub.aclose()
             except Exception:  # noqa: BLE001
-                pass
+                logger.warning("ws manager: pub/sub shutdown failed", exc_info=True)
 
     async def _listen(self) -> None:
         try:

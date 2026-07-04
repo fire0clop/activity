@@ -2,7 +2,17 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKey
@@ -10,6 +20,17 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKey
 
 class Event(Base, UUIDPrimaryKey, TimestampMixin):
     __tablename__ = "events"
+    __table_args__ = (
+        CheckConstraint("min_participants >= 1", name="ck_events_min_ge_1"),
+        CheckConstraint(
+            "max_participants IS NULL OR min_participants <= max_participants",
+            name="ck_events_min_le_max",
+        ),
+        CheckConstraint(
+            "latitude >= -90 AND latitude <= 90 AND longitude >= -180 AND longitude <= 180",
+            name="ck_events_coords_range",
+        ),
+    )
 
     organizer_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False

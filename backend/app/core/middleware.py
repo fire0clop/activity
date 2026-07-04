@@ -61,6 +61,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if count == 1:
                 await redis.expire(key, 60)
         except Exception:  # noqa: BLE001 - Redis недоступен → не блокируем трафик
+            logger.warning("rate limit: Redis unavailable, request passed unthrottled", exc_info=True)
             return await call_next(request)
 
         if count > settings.rate_limit_per_min:

@@ -4,6 +4,7 @@ import uuid
 
 import boto3
 from botocore.config import Config as BotoConfig
+from botocore.exceptions import ClientError
 from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -107,7 +108,8 @@ class S3Storage(StorageService):
     async def ensure_bucket(self) -> None:
         try:
             await asyncio.to_thread(self._client.head_bucket, Bucket=settings.s3_bucket)
-        except Exception:  # noqa: BLE001
+        except ClientError:
+            # бакета нет (404) или нет прав HEAD — пробуем создать; иные ошибки всплывут
             await asyncio.to_thread(self._client.create_bucket, Bucket=settings.s3_bucket)
 
     async def save(self, file: UploadFile, subdir: str) -> str:

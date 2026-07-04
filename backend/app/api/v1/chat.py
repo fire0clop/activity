@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -11,6 +12,8 @@ from app.services import chat_service
 from app.ws.manager import manager
 
 router = APIRouter(tags=["chat-ws"])
+
+logger = logging.getLogger("chat")
 
 HISTORY_LIMIT = 50
 
@@ -95,5 +98,6 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
         await manager.disconnect(conversation_id, user_id, websocket)
         await _broadcast_presence(conversation_id)
     except Exception:  # noqa: BLE001
+        logger.exception("chat ws: unexpected error, closing connection")
         await manager.disconnect(conversation_id, user_id, websocket)
         await _broadcast_presence(conversation_id)
