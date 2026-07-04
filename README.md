@@ -10,6 +10,7 @@ Activity (internal codename *Skhodka* — Russian for "meetup") is a location-ba
 
 The repository contains a native **SwiftUI iOS client** and an **async FastAPI backend** backed by **PostgreSQL + PostGIS**, with real-time chat over WebSockets and push notifications via **APNs** (iOS) and **FCM** (Android-ready).
 
+[![backend-ci](https://github.com/fire0clop/activity/actions/workflows/ci.yml/badge.svg)](https://github.com/fire0clop/activity/actions/workflows/ci.yml)
 ![Swift](https://img.shields.io/badge/Swift-5.0-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-iOS_17+-0071E3?logo=apple&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
@@ -37,7 +38,7 @@ The core loop is deliberately tight:
 ## Features
 
 **Auth & identity**
-- Phone-number registration verified by SMS OTP (Redis-backed, rate-limited, resend cooldown).
+- Phone-number registration verified by SMS OTP (Redis-backed, rate-limited, resend cooldown); pluggable SMS providers (Twilio / SMSC.ru, stub in dev).
 - Password login with brute-force throttling; SMS-verified password reset that revokes all sessions.
 - JWT access tokens with rotating, hashed, revocable refresh tokens.
 - Profile gating: creating events / joining requires a completed profile (name, avatar, bio).
@@ -66,6 +67,8 @@ The core loop is deliberately tight:
 **Push notifications**
 - APNs (iOS, direct `.p8` token auth) and FCM HTTP v1 (Android) behind one `send_push` interface.
 - Device-token registration endpoint; invalid tokens are auto-pruned on delivery failure.
+- Category / district subscriptions: subscribers get a push when a matching event is published nearby.
+- New chat messages notify offline conversation members; every push deep-links into the right screen (event or chat).
 - Graceful degradation: if a provider isn't configured, delivery logs a stub instead of failing the request.
 
 **Media & storage**
@@ -73,7 +76,7 @@ The core loop is deliberately tight:
 - Images validated and re-encoded via Pillow (resize by longest side, EXIF stripped).
 
 **Production hardening**
-- Redis-based per-IP rate limiting, structured JSON logs with request IDs, deep health check (DB + Redis), env-driven CORS, and fail-fast config validation that refuses to boot with insecure production settings.
+- Redis-based per-IP rate limiting plus per-user limits on spam-prone actions (create event, join, report, chat messages), structured JSON logs with request IDs, deep health check (DB + Redis), env-driven CORS, and fail-fast config validation that refuses to boot with insecure production settings.
 - Alembic migrations, a production Docker Compose (gunicorn + uvicorn workers), and CI that rebuilds the schema from scratch before running the suite.
 
 ## Architecture
@@ -132,7 +135,7 @@ flowchart LR
 | Push | aioapns (APNs), google-auth + FCM HTTP v1 |
 | Migrations | Alembic |
 | Infra | Docker, Docker Compose, GitHub Actions CI |
-| Quality | pytest, ruff, mypy |
+| Quality | pytest (44 backend tests), Swift Testing (13 iOS unit tests), ruff, mypy |
 
 ## Project Structure
 

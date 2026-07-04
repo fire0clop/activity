@@ -73,12 +73,14 @@ docker compose -f docker-compose.prod.yml up -d              # gunicorn + uvicor
 | Беседы + чат (WebSocket) + **Redis pub/sub fan-out (мульти-инстанс)** + read-receipts | ✅ |
 | Завершение события (ручное + авто-sweeper) → отзывы и рейтинг | ✅ |
 | Жалобы/блокировки (применяются в ленте и заявках) | ✅ |
+| Подписки на категорию/район → пуш о новых событиях | ✅ |
+| Групповые чаты V2 (создание/состав/роли) | ✅ + клиент iOS |
 | S3/MinIO хранилище + Pillow-обработка картинок | ✅ |
-| Rate-limit (Redis), structured JSON-логи + request_id, deep-health, CORS из env, fail-fast | ✅ |
+| Rate-limit (Redis: per-IP + per-user на спам-действия), structured JSON-логи + request_id, deep-health, CORS из env, fail-fast | ✅ |
 | Alembic-миграции + прод-compose (gunicorn) + CI | ✅ |
-| Тесты (auth/профиль/гео/waitlist/блокировки/чат/отзывы) | ✅ 13 шт. |
+| Тесты (auth/гео/waitlist/чат WS/пуши/подписки/лимиты/констрейнты/SMS) | ✅ 44 шт. |
 | Push (FCM HTTP v1) | ✅ подключён (project `activity-fbdeb`), авторизация и путь отправки проверены; невалидные токены авто-удаляются |
-| Реальные SMS | ⚙️ интерфейс `otp_service._send_sms`; нужен провайдер (Twilio/SMSC) |
+| Реальные SMS | ✅ Twilio и SMSC.ru реализованы; креды подключаются в .env (в проде stub запрещён fail-fast'ом) |
 | Нагрузочное тестирование, APM/мониторинг, алёрты | ⛔ требует вашей инфраструктуры |
 
 > Граница «боевой под нагрузкой»: код production-grade и проверен функционально/интеграционно,
