@@ -24,6 +24,13 @@ final class AuthManager: ObservableObject {
         api.onUnauthorized = { [weak self] in
             Task { @MainActor in self?.signOut() }
         }
+        // Бэк ответил 403 profile_incomplete — принудительно возвращаем в онбординг.
+        api.onProfileIncomplete = { [weak self] in
+            Task { @MainActor in
+                guard let self, self.state == .signedIn else { return }
+                self.state = .onboarding
+            }
+        }
         // Когда APNs выдаст токен — регистрируем устройство на бэке.
         PushCenter.shared.onToken = { [weak self] token in
             Task { @MainActor in await self?.registerDevice(token) }
@@ -55,7 +62,7 @@ final class AuthManager: ObservableObject {
                     PushCenter.shared.requestAuthorizationAndRegister()
                 }
             }
-        } catch let err as APIError where err.code == "unauthorized" {
+        } catch let err as APIError where err.isCode(.unauthorized) {
             signOut()
         } catch {
             // сеть недоступна — оставляем гостем, чтобы дать возможность войти заново

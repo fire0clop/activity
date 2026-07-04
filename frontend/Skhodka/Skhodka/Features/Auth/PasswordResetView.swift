@@ -87,7 +87,7 @@ struct PasswordResetView: View {
             if asSheet { dismiss() }
         } catch let err as APIError {
             errorText = err.message
-            if err.code == "invalid_code" || err.code == "code_expired" { code = "" }
+            if err.isCode(.invalidCode) || err.isCode(.codeExpired) { code = "" }
         } catch { errorText = "Нет соединения с сервером" }
     }
 }

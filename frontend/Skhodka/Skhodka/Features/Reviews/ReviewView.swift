@@ -63,7 +63,7 @@ struct ReviewView: View {
                 path: "/events/\(event.id)/reviews", method: .post, body: body))
             done.insert(p.id)
         } catch let err as APIError {
-            if err.code == "already_reviewed" { done.insert(p.id) } else { errorText = err.message }
+            if err.isCode(.alreadyReviewed) { done.insert(p.id) } else { errorText = err.message }
         } catch { errorText = "Не удалось отправить отзыв" }
     }
 

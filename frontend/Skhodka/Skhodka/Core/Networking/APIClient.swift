@@ -9,6 +9,9 @@ final class APIClient {
     /// Вызывается, когда сессия окончательно невалидна (refresh не удался).
     var onUnauthorized: (() -> Void)?
 
+    /// Вызывается на 403 profile_incomplete — профиль не заполнен, нужен онбординг.
+    var onProfileIncomplete: (() -> Void)?
+
     init(base: URL = AppConfig.baseURL, tokenStore: TokenStore, session: URLSession = .shared) {
         self.base = base
         self.tokenStore = tokenStore
@@ -61,7 +64,7 @@ final class APIClient {
         req.httpBody = body
 
         let (data, resp) = try await session.data(for: req)
-        try Self.checkStatus(data: data, resp: resp)
+        try checkStatusIntercepting(data: data, resp: resp)
         return try Self.decoder.decode(T.self, from: data)
     }
 
@@ -82,8 +85,20 @@ final class APIClient {
                 throw APIError.local("Сессия истекла", code: "unauthorized")
             }
         }
-        try Self.checkStatus(data: data, resp: resp)
+        try checkStatusIntercepting(data: data, resp: resp)
         return data
+    }
+
+    /// Проверка статуса + глобальные перехваты (profile_incomplete → онбординг).
+    private func checkStatusIntercepting(data: Data, resp: URLResponse) throws {
+        do {
+            try Self.checkStatus(data: data, resp: resp)
+        } catch let err as APIError {
+            if err.status == 403, err.isCode(.profileIncomplete) {
+                onProfileIncomplete?()
+            }
+            throw err
+        }
     }
 
     private func makeRequest(_ endpoint: Endpoint) throws -> URLRequest {
