@@ -1,7 +1,8 @@
 import uuid
 
 from fastapi import APIRouter, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import aliased
 
 from app.core.deps import CompleteUser, CurrentUser, DbSession
 from app.core.exceptions import forbidden, not_found
@@ -114,9 +115,14 @@ async def list_conversations(
     memberships = memberships[:limit]
 
     conv_ids = [m.conversation_id for m in memberships]
-    # Батчим тяжёлые фан-ауты одним запросом каждый (раньше — N запросов на список).
+    # Всё, что раньше делалось запросом-на-беседу (last message, unread, аватар, счётчик),
+    # считаем несколькими батч-запросами фиксированного числа — независимо от размера списка.
     convs_by_id: dict[uuid.UUID, Conversation] = {}
     counts_by_conv: dict[uuid.UUID, int] = {}
+    last_by_conv: dict[uuid.UUID, Message] = {}
+    unread_by_conv: dict[uuid.UUID, int] = {}
+    cover_by_event: dict[uuid.UUID, str | None] = {}
+    sender_names: dict[uuid.UUID, str | None] = {}
     if conv_ids:
         conv_rows = (
             await db.execute(select(Conversation).where(Conversation.id.in_(conv_ids)))
@@ -132,15 +138,89 @@ async def list_conversations(
         ).all()
         counts_by_conv = {cid: int(n) for cid, n in count_rows}
 
+        # Последнее сообщение каждой беседы одним запросом (DISTINCT ON).
+        last_rows = (
+            await db.execute(
+                select(Message)
+                .where(Message.conversation_id.in_(conv_ids))
+                .order_by(Message.conversation_id, Message.created_at.desc())
+                .distinct(Message.conversation_id)
+            )
+        ).scalars().all()
+        last_by_conv = {m.conversation_id: m for m in last_rows}
+
+        # Имена отправителей последних сообщений — одной пачкой.
+        sender_ids = {m.sender_id for m in last_rows if m.sender_id}
+        if sender_ids:
+            users = (
+                await db.execute(select(User).where(User.id.in_(sender_ids)))
+            ).scalars().all()
+            sender_names = {u.id: u.name for u in users}
+
+        # Обложки событий (аватар беседы-события) — одной пачкой.
+        event_ids = {c.event_id for c in conv_rows if c.type == "event" and c.event_id}
+        if event_ids:
+            events = (
+                await db.execute(select(Event).where(Event.id.in_(event_ids)))
+            ).scalars().all()
+            cover_by_event = {e.id: e.cover_url for e in events}
+
+        # Непрочитанные для ТЕКУЩЕГО пользователя по всем беседам — одним join-запросом.
+        lr = aliased(Message)
+        msg = aliased(Message)
+        unread_rows = (
+            await db.execute(
+                select(ConversationMember.conversation_id, func.count(msg.id))
+                .select_from(ConversationMember)
+                .outerjoin(lr, lr.id == ConversationMember.last_read_message_id)
+                .join(
+                    msg,
+                    and_(
+                        msg.conversation_id == ConversationMember.conversation_id,
+                        or_(
+                            ConversationMember.last_read_message_id.is_(None),
+                            msg.created_at > lr.created_at,
+                        ),
+                    ),
+                )
+                .where(
+                    ConversationMember.user_id == current_user.id,
+                    ConversationMember.conversation_id.in_(conv_ids),
+                )
+                .group_by(ConversationMember.conversation_id)
+            )
+        ).all()
+        unread_by_conv = {cid: int(n) for cid, n in unread_rows}
+
     items: list[ConversationListItem] = []
     for m in memberships:
         conv = convs_by_id.get(m.conversation_id)
-        if conv is not None:
-            items.append(
-                await _build_list_item(
-                    db, conv, m, members_count=counts_by_conv.get(conv.id, 0)
-                )
+        if conv is None:
+            continue
+        last_msg = last_by_conv.get(conv.id)
+        last = (
+            LastMessage(
+                text=last_msg.text,
+                created_at=last_msg.created_at,
+                sender_name=sender_names.get(last_msg.sender_id) if last_msg.sender_id else None,
             )
+            if last_msg is not None
+            else None
+        )
+        avatar = cover_by_event.get(conv.event_id) if conv.type == "event" and conv.event_id else None
+        items.append(
+            ConversationListItem(
+                id=conv.id,
+                type=conv.type,
+                title=conv.title,
+                avatar_url=avatar,
+                event_id=conv.event_id,
+                members_count=counts_by_conv.get(conv.id, 0),
+                last_message=last,
+                unread_count=unread_by_conv.get(conv.id, 0),
+                is_archived=conv.is_archived,
+            )
+        )
 
     next_cursor = encode_cursor(offset + limit) if has_more else None
     return ConversationListOut(items=items, next_cursor=next_cursor)
@@ -162,11 +242,10 @@ async def get_conversation(
             )
         )
     ).scalars().all()
-    members = []
-    for uid in member_rows:
-        user = await db.get(User, uid)
-        if user:
-            members.append(UserPublic.from_model(user))
+    users = (
+        await db.execute(select(User).where(User.id.in_(member_rows)))
+    ).scalars().all() if member_rows else []
+    members = [UserPublic.from_model(u) for u in users]
 
     base = await _build_list_item(db, conv, member)
     return ConversationDetail(**base.model_dump(), members=members, my_role=member.role)

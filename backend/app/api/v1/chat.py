@@ -73,7 +73,6 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
         if conv is None or not await chat_service.is_member(db, conversation_id, user_id):
             await websocket.close(code=4403)
             return
-        is_archived = conv.is_archived
 
     await manager.connect(conversation_id, user_id, websocket, subprotocol=subprotocol)
     await _send_history(websocket, conversation_id)
@@ -87,11 +86,6 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
                 text = (data.get("text") or "").strip()
                 if not text:
                     continue
-                if is_archived:
-                    await websocket.send_json(
-                        {"type": "error", "code": "forbidden", "detail": "Беседа архивирована"}
-                    )
-                    continue
                 if not await allow_user_action(
                     websocket.app.state.redis, user_id, "chat_message",
                     settings.user_rl_messages_per_min, 60,
@@ -102,6 +96,14 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
                     )
                     continue
                 async with SessionLocal() as db2:
+                    # Перечитываем архивный статус: беседа могла быть архивирована
+                    # свипером уже ПОСЛЕ подключения этого сокета.
+                    conv = await db2.get(Conversation, conversation_id)
+                    if conv is None or conv.is_archived:
+                        await websocket.send_json(
+                            {"type": "error", "code": "forbidden", "detail": "Беседа архивирована"}
+                        )
+                        continue
                     await chat_service.post_message(db2, conversation_id, text, sender_id=user_id)
             elif mtype == "typing":
                 await manager.broadcast(

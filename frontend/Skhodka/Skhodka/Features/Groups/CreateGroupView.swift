@@ -77,13 +77,21 @@ struct CreateGroupView: View {
         } catch let err as APIError { errorText = err.message; return }
         catch { errorText = "Не удалось загрузить список. Проверьте соединение."; return }
 
+        // Детали бесед тянем ПАРАЛЛЕЛЬНО (раньше — до 20 последовательных запросов подряд).
+        let api = auth.api
+        let details = await withTaskGroup(of: ConversationDetail?.self) { group in
+            for conv in list.items.prefix(20) {
+                group.addTask { try? await api.send(Endpoint(path: "/conversations/\(conv.id)")) }
+            }
+            var acc: [ConversationDetail] = []
+            for await detail in group where detail != nil { acc.append(detail!) }
+            return acc
+        }
+        let myID = auth.me?.id
         var seen: [String: UserPublic] = [:]
-        for conv in list.items.prefix(20) {
-            if let detail: ConversationDetail =
-                try? await auth.api.send(Endpoint(path: "/conversations/\(conv.id)")) {
-                for member in detail.members where member.id != auth.me?.id {
-                    seen[member.id] = member
-                }
+        for detail in details {
+            for member in detail.members where member.id != myID {
+                seen[member.id] = member
             }
         }
         candidates = seen.values.sorted { ($0.name ?? "") < ($1.name ?? "") }

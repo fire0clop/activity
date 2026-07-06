@@ -83,7 +83,18 @@ async def create_event(
         import asyncio
 
         from app.services.geo_service import parse_location
-        coords = await asyncio.to_thread(parse_location, body.map_url)
+        try:
+            # Жёсткий потолок на весь разбор (внешний сервис + редиректы), чтобы зависший
+            # map_url не удерживал воркер/соединение неограниченно.
+            coords = await asyncio.wait_for(
+                asyncio.to_thread(parse_location, body.map_url), timeout=15
+            )
+        except TimeoutError as exc:
+            raise AppError(
+                "geo_timeout",
+                "Не удалось обработать ссылку на карту вовремя. Попробуйте ещё раз или пришлите координаты.",
+                503,
+            ) from exc
         if coords is None:
             raise AppError(
                 "validation_error",
