@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Дизайн-система «Сходка» — editorial / журнальный стиль:
 /// бумажный фон, серифные заголовки, один тёплый акцент, цветные категории.
@@ -11,6 +12,8 @@ enum Theme {
     static let line = Color(red: 0.90, green: 0.88, blue: 0.82)         // хайрлайны
     static let accent = Color(red: 1.0, green: 0.31, blue: 0.18)        // коралл-акцент
     static let accentSoft = Color(red: 1.0, green: 0.31, blue: 0.18).opacity(0.12)
+    static let star = Color(red: 0.98, green: 0.70, blue: 0.10)         // цвет рейтинга-звезды
+    static let danger = Color(red: 0.85, green: 0.20, blue: 0.16)       // ошибки/деструктив
 
     // Совместимость со старым кодом
     static let bg = paper
@@ -22,6 +25,34 @@ enum Radii {
     static let card: CGFloat = 22
     static let pill: CGFloat = 100
     static let sm: CGFloat = 14
+}
+
+/// Шкала отступов — вместо разрозненных 8/10/12/14/16 по экранам.
+enum Spacing {
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 12
+    static let lg: CGFloat = 16
+    static let xl: CGFloat = 24
+}
+
+/// Тактильный отклик. Приложение-чат без хаптики ощущается «мёртвым».
+enum Haptics {
+    static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+    }
+    static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+    static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+}
+
+/// Нажатие карточки: лёгкое «поддавливание» вместо мёртвого `.buttonStyle(.plain)`.
+struct CardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.94 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+    }
 }
 
 // MARK: - Категории (иконка + цвет + короткое имя)
@@ -48,6 +79,9 @@ enum Categories {
         if let key, let c = map[key.lowercased()] { return c }
         return .init(title: key?.isEmpty == false ? key! : "Событие", icon: "sparkles", color: Theme.accent)
     }
+
+    /// Упорядоченный набор ключей для выбора чипами (без дублей по смыслу).
+    static let pickable = ["walk", "sport", "watersport", "music", "boardgames", "food"]
 }
 
 // MARK: - Типографика (сериф для заголовков = журнальный вид)
@@ -119,7 +153,7 @@ struct RatingView: View {
     let count: Int
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: "star.fill").foregroundStyle(Color(red: 0.98, green: 0.7, blue: 0.1)).font(.caption2)
+            Image(systemName: "star.fill").foregroundStyle(Theme.star).font(.caption2)
             Text(count > 0 ? String(format: "%.1f", value) : "—")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink2)
             if count > 0 { Text("(\(count))").font(.caption2).foregroundStyle(Theme.ink2) }
@@ -171,8 +205,8 @@ struct StarPicker: View {
         HStack(spacing: 6) {
             ForEach(1...5, id: \.self) { i in
                 Image(systemName: i <= rating ? "star.fill" : "star")
-                    .font(.title3).foregroundStyle(i <= rating ? Color(red: 0.98, green: 0.7, blue: 0.1) : Theme.line)
-                    .onTapGesture { rating = i }
+                    .font(.title3).foregroundStyle(i <= rating ? Theme.star : Theme.line)
+                    .onTapGesture { rating = i; Haptics.tap() }
             }
         }
         .accessibilityElement(children: .ignore)

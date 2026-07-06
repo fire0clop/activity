@@ -281,6 +281,7 @@ struct EventDetailView: View {
         actionLoading = true; errorText = nil; defer { actionLoading = false }
         do {
             let _: JoinResponse = try await auth.api.send(Endpoint(path: "/events/\(eventID)/join", method: .post))
+            Haptics.success()
             await load()
         } catch let err as APIError { errorText = err.message } catch { errorText = "Не удалось откликнуться" }
     }

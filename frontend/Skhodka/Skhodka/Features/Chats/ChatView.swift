@@ -43,7 +43,7 @@ struct ChatView: View {
                     Button {
                         // Очищаем поле только если сообщение реально ушло в сокет —
                         // иначе при обрыве текст молча пропадал бы.
-                        if ws.send(text: draft) { draft = "" }
+                        if ws.send(text: draft) { draft = ""; Haptics.tap() }
                     } label: { Image(systemName: "paperplane.fill") }
                         .disabled(!ws.connected || draft.trimmingCharacters(in: .whitespaces).isEmpty)
                         .accessibilityLabel("Отправить сообщение")

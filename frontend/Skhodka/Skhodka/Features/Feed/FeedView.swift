@@ -271,7 +271,7 @@ private struct FeatureEventCard: View {
                 }.padding(14)
             }
             .cardStyle()
-        }.buttonStyle(.plain)
+        }.buttonStyle(CardButtonStyle())
     }
 }
 
@@ -298,7 +298,7 @@ private struct BentoEventCard: View {
             }
             .frame(maxWidth: .infinity)
             .cardStyle()
-        }.buttonStyle(.plain)
+        }.buttonStyle(CardButtonStyle())
     }
 }
 
@@ -331,7 +331,7 @@ private struct WideEventCard: View {
             }
             .frame(maxWidth: .infinity)
             .cardStyle()
-        }.buttonStyle(.plain)
+        }.buttonStyle(CardButtonStyle())
     }
 }
 

@@ -34,8 +34,18 @@ struct EventCreateView: View {
         Form {
             Section("Что и когда") {
                 TextField("Название (напр. «Гидроциклы»)", text: $title)
-                TextField("Категория (напр. watersport)", text: $category)
                 DatePicker("Начало", selection: $startsAt, in: Date()...)
+            }
+            Section("Категория") {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.sm) {
+                        ForEach(Categories.pickable, id: \.self) { key in
+                            categoryChip(key)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
             Section("Где") {
                 Button {
@@ -109,6 +119,25 @@ struct EventCreateView: View {
         }
     }
 
+    private func categoryChip(_ key: String) -> some View {
+        let c = Categories.of(key)
+        let selected = category == key
+        return Button {
+            category = selected ? "" : key
+            Haptics.tap()
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: c.icon).font(.system(size: 12, weight: .bold))
+                Text(c.title).font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(selected ? .white : c.color)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(selected ? c.color : c.color.opacity(0.12))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func loadPhotos(_ items: [PhotosPickerItem]) async {
         var images: [UIImage] = []
         for item in items {
@@ -150,6 +179,7 @@ struct EventCreateView: View {
                         fileName: "photo.jpg", mimeType: "image/jpeg")
                 }
             }
+            Haptics.success()
             dismiss()
         } catch let err as APIError {
             errorText = err.message
