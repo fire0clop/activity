@@ -54,7 +54,12 @@ async def upload_photo(current_user: CurrentUser, db: DbSession, file: UploadFil
 
 @router.delete("/me/photos", response_model=PhotosOut)
 async def delete_photo(current_user: CurrentUser, db: DbSession, url: str = Query(...)) -> PhotosOut:
-    photos = [p for p in (current_user.photo_urls or []) if p != url]
+    existing = list(current_user.photo_urls or [])
+    photos = [p for p in existing if p != url]
+    # Удаляем файл из хранилища ТОЛЬКО если url реально принадлежал пользователю,
+    # иначе можно было бы стереть чужой файл, зная его публичный URL.
+    if len(photos) == len(existing):
+        raise not_found("Фото не найдено")
     current_user.photo_urls = photos
     await db.commit()
     await get_storage().delete(url)

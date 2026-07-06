@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     otp_length: int = 6
     otp_max_attempts: int = 5
     otp_resend_cooldown_sec: int = 60
+    # Жёсткий per-IP лимит именно на запрос кода: cooldown per-phone не мешает слать
+    # SMS на МНОЖЕСТВО разных номеров с одного IP (SMS-бомбинг за счёт нашего счёта).
+    otp_request_ip_per_hour: int = 10
     sms_provider: str = "stub"  # stub | smsc | twilio
     sms_sender: str = ""        # имя отправителя (опционально; согласуется в кабинете SMSC)
     smsc_login: str = ""

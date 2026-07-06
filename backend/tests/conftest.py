@@ -80,7 +80,7 @@ async def _complete_profile(client: httpx.AsyncClient, token: str, name: str) ->
 @pytest_asyncio.fixture
 async def user_factory(client: httpx.AsyncClient):
     async def make(name: str, complete: bool = True) -> dict:
-        phone = "+7999" + uuid.uuid4().hex[:7]
+        phone = "+7999" + f"{uuid.uuid4().int % 10_000_000:07d}"
         token = await _login(client, phone)
         if complete:
             await _complete_profile(client, token, name)

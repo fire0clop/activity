@@ -45,9 +45,9 @@ final class WebSocketClient: NSObject, ObservableObject {
         }
         let url = AppConfig.wsBaseURL
             .appendingPathComponent("ws/chat/\(conversationID)")
-        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-        comps.queryItems = [URLQueryItem(name: "token", value: token)]
-        let task = URLSession.shared.webSocketTask(with: comps.url!)
+        // Токен передаём через Sec-WebSocket-Protocol ("bearer, <jwt>"), а не в query —
+        // так он не утекает в access-логи reverse-proxy. Сервер эхом выбирает "bearer".
+        let task = URLSession.shared.webSocketTask(with: url, protocols: ["bearer", token])
         self.task = task
         task.resume()
         receive()

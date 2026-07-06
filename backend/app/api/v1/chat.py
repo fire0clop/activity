@@ -44,8 +44,23 @@ async def _broadcast_presence(conversation_id: uuid.UUID) -> None:
     )
 
 
+def _extract_ws_token(websocket: WebSocket, query_token: str) -> tuple[str, str | None]:
+    """Достаёт access-токен. Предпочитаем Sec-WebSocket-Protocol (не попадает в логи
+    reverse-proxy, в отличие от ?token=...). Формат подпротоколов: "bearer, <jwt>".
+
+    Возвращает (token, subprotocol_to_echo). query-fallback оставлен для тестов/дев-инструментов.
+    """
+    proto = websocket.headers.get("sec-websocket-protocol")
+    if proto:
+        parts = [p.strip() for p in proto.split(",")]
+        if len(parts) >= 2 and parts[0] == "bearer":
+            return parts[1], "bearer"
+    return query_token, None
+
+
 @router.websocket("/ws/chat/{conversation_id}")
 async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str = "") -> None:
+    token, subprotocol = _extract_ws_token(websocket, token)
     try:
         payload = decode_token(token, expected_type="access")
         user_id = uuid.UUID(payload["sub"])
@@ -60,7 +75,7 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
             return
         is_archived = conv.is_archived
 
-    await manager.connect(conversation_id, user_id, websocket)
+    await manager.connect(conversation_id, user_id, websocket, subprotocol=subprotocol)
     await _send_history(websocket, conversation_id)
     await _broadcast_presence(conversation_id)
 

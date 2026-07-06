@@ -14,7 +14,11 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
-from app.core.middleware import RateLimitMiddleware, RequestContextMiddleware
+from app.core.middleware import (
+    RateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.db.base import Base
 from app.db.session import engine
 from app.services.lifecycle import run_sweeper
@@ -58,6 +62,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Сходка API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,

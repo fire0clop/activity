@@ -24,7 +24,7 @@ API = "/api/v1"
 
 
 def _make_user(tc: TestClient, name: str) -> dict:
-    phone = "+7999" + uuid.uuid4().hex[:7]
+    phone = "+7999" + f"{uuid.uuid4().int % 10_000_000:07d}"
     tc.post(f"{API}/auth/request-code", json={"phone": phone})
     r = sync_redis.Redis.from_url(settings.redis_url)
     code = r.get(f"otp:{phone}").decode()

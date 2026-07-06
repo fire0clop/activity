@@ -1,9 +1,10 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 from sqlalchemy import select, update
 
+from app.core.config import settings
 from app.core.deps import DbSession, RedisDep
 from app.core.exceptions import AppError, conflict, not_found, unauthorized
 from app.core.security import (
@@ -81,9 +82,35 @@ async def _revoke_all(db: DbSession, user_id: uuid.UUID) -> None:
     )
 
 
+async def _check_request_code_ip_limit(redis: RedisDep, request: Request) -> None:
+    """Ограничивает число запросов кода с одного IP в час (анти-SMS-бомбинг).
+
+    При недоступном Redis — пропускаем (деградация в сторону доступности, как и общий лимит)."""
+    limit = settings.otp_request_ip_per_hour
+    if not settings.rate_limit_enabled or limit <= 0:
+        return
+    ip = request.client.host if request.client else "unknown"
+    window = int(datetime.now(UTC).timestamp() // 3600)
+    key = f"otp_ip:{ip}:{window}"
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, 3600)
+    except Exception:  # noqa: BLE001 - Redis недоступен → не блокируем
+        return
+    if count > limit:
+        raise AppError(
+            "rate_limited",
+            "Слишком много запросов кода. Повторите позже.",
+            429,
+            headers={"Retry-After": "3600"},
+        )
+
+
 @router.post("/request-code", response_model=RequestCodeOut)
-async def request_code(body: RequestCodeIn, redis: RedisDep) -> RequestCodeOut:
+async def request_code(body: RequestCodeIn, redis: RedisDep, request: Request) -> RequestCodeOut:
     """Отправляет SMS-код. Используется при регистрации и смене пароля."""
+    await _check_request_code_ip_limit(redis, request)
     resend_after = await otp_service.request_code(redis, body.phone)
     return RequestCodeOut(sent=True, resend_after_sec=resend_after)
 

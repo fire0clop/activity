@@ -40,7 +40,9 @@ final class TokenStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecValueData as String: Data(value.utf8),
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            // ThisDeviceOnly: токен не попадает в iCloud/iTunes-бэкап и не восстанавливается
+            // на другом устройстве (refresh-токен живёт 30 дней — снижаем риск угона сессии).
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         SecItemAdd(query as CFDictionary, nil)
     }

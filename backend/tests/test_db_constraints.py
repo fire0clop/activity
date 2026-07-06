@@ -14,7 +14,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _make_user(db) -> uuid.UUID:
-    user = User(phone="+7999" + uuid.uuid4().hex[:7])
+    user = User(phone="+7999" + f"{uuid.uuid4().int % 10_000_000:07d}")
     db.add(user)
     await db.flush()
     return user.id

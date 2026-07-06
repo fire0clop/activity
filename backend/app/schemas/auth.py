@@ -1,8 +1,14 @@
+from typing import Annotated
+
 from pydantic import BaseModel, Field
+
+# Единый формат телефона: E.164 РФ (+7 и 10 цифр). Ограничивает вход, который иначе
+# идёт напрямую в ключи Redis и в тело запроса к SMS-провайдеру (защита от мусора/abuse).
+PhoneStr = Annotated[str, Field(pattern=r"^\+7\d{10}$", max_length=12, examples=["+79991234567"])]
 
 
 class RequestCodeIn(BaseModel):
-    phone: str = Field(..., examples=["+79991234567"])
+    phone: PhoneStr
 
 
 class RequestCodeOut(BaseModel):
@@ -20,7 +26,7 @@ class TokenPair(BaseModel):
 # --- Регистрация по телефону (SMS) + пароль -------------------------------
 
 class RegisterIn(BaseModel):
-    phone: str
+    phone: PhoneStr
     code: str
     password: str = Field(..., min_length=6, max_length=128)
 
@@ -32,14 +38,14 @@ class RegisterOut(TokenPair):
 # --- Вход по паролю (без SMS) ---------------------------------------------
 
 class LoginIn(BaseModel):
-    phone: str
+    phone: PhoneStr
     password: str
 
 
 # --- Смена/сброс пароля (подтверждение по SMS) ----------------------------
 
 class ResetPasswordIn(BaseModel):
-    phone: str
+    phone: PhoneStr
     code: str
     new_password: str = Field(..., min_length=6, max_length=128)
 

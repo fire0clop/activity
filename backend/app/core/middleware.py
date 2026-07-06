@@ -39,6 +39,25 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Проставляет security-заголовки ответа (defense-in-depth поверх reverse-proxy)."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        # HSTS имеет смысл только под HTTPS; в dev по http не выставляем.
+        if not settings.is_dev:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Грубый rate-limit на IP (фиксированное окно в Redis). Защита от всплесков/перебора.
 

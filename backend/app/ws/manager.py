@@ -72,8 +72,16 @@ class ConnectionManager:
         for ws in dead:
             self._rooms.get(conversation_id, set()).discard(ws)
 
-    async def connect(self, conversation_id: uuid.UUID, user_id: uuid.UUID, ws: WebSocket) -> None:
-        await ws.accept()
+    async def connect(
+        self,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        ws: WebSocket,
+        subprotocol: str | None = None,
+    ) -> None:
+        # Если клиент прислал токен через Sec-WebSocket-Protocol, обязаны выбрать подпротокол
+        # в ответе, иначе рукопожатие не завершится у строгих клиентов.
+        await ws.accept(subprotocol=subprotocol)
         self._rooms[conversation_id].add(ws)
         self._local_user_conns[(conversation_id, user_id)] += 1
         if self._redis is not None:
