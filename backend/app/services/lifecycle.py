@@ -7,6 +7,7 @@ from sqlalchemy import or_, select, update
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation
 from app.models.event import Event
+from app.services import matching_service
 
 logger = logging.getLogger("lifecycle")
 
@@ -36,6 +37,8 @@ async def _sweep_once() -> int:
         await db.execute(
             update(Conversation).where(Conversation.event_id.in_(rows)).values(is_archived=True)
         )
+        # Засчитываем посещение accepted-участникам авто-завершённых событий.
+        await matching_service.mark_attended(db, list(rows))
         await db.commit()
         return len(rows)
 

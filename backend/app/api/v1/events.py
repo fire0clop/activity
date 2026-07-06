@@ -3,7 +3,7 @@ from datetime import UTC, datetime, time, timedelta
 
 from fastapi import APIRouter, File, Query, UploadFile, status
 from geoalchemy2 import Geography
-from sqlalchemy import String, cast, func, select
+from sqlalchemy import String, cast, func, or_, select
 
 from app.core.config import settings
 from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
@@ -214,6 +214,55 @@ async def list_events(
     return EventListOut(items=items, next_cursor=next_cursor)
 
 
+@router.get("/mine", response_model=EventListOut)
+async def my_events(
+    current_user: CurrentUser,
+    db: DbSession,
+    limit: int = Query(50, ge=1, le=100),
+) -> EventListOut:
+    """Мои события: которые я организую ИЛИ в которых участвую, включая завершённые.
+
+    Основная лента отдаёт только open/full — так пользователь не мог найти свою историю.
+    Порядок — от ближайших/будущих к прошлым (starts_at по убыванию).
+    """
+    my_part_sq = (
+        select(Participation.event_id)
+        .where(
+            Participation.user_id == current_user.id,
+            Participation.status.in_(["accepted", "pending", "waitlisted"]),
+        )
+    )
+    accepted_sq = (
+        select(func.count())
+        .select_from(Participation)
+        .where(Participation.event_id == Event.id, Participation.status == "accepted")
+        .correlate(Event)
+        .scalar_subquery()
+    )
+    my_status_sq = (
+        select(Participation.status)
+        .where(Participation.event_id == Event.id, Participation.user_id == current_user.id)
+        .correlate(Event)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(Event, User, accepted_sq.label("cnt"), my_status_sq.label("my"))
+        .join(User, User.id == Event.organizer_id)
+        .where(or_(Event.organizer_id == current_user.id, Event.id.in_(my_part_sq)))
+        .order_by(Event.starts_at.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    items = [
+        event_service.build_list_item(
+            event, organizer, viewer_id=current_user.id, my_status=my,
+            participants_current=int(cnt or 0), distance_km=None,
+        )
+        for event, organizer, cnt, my in rows
+    ]
+    return EventListOut(items=items, next_cursor=None)
+
+
 @router.get("/{event_id}", response_model=EventDetail)
 async def get_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> EventDetail:
     event = await db.get(Event, event_id)
@@ -294,11 +343,15 @@ async def finish_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSes
         raise not_found("Событие не найдено")
     if event.organizer_id != current_user.id:
         raise forbidden("Только организатор может завершить событие")
+    already_finished = event.status == "finished"
     event.status = "finished"
     conv = await db.execute(select(Conversation).where(Conversation.event_id == event.id))
     c = conv.scalar_one_or_none()
     if c is not None:
         c.is_archived = True
+    # Посещение засчитываем один раз — при первом переводе в finished.
+    if not already_finished:
+        await matching_service.mark_attended(db, [event.id])
     await db.commit()
     await db.refresh(event)
 

@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event import Event
@@ -58,6 +58,28 @@ async def blocked_user_ids(db: AsyncSession, user_id: uuid.UUID) -> set[uuid.UUI
     return blocked
 
 
+async def mark_attended(db: AsyncSession, event_ids: list[uuid.UUID]) -> None:
+    """Засчитывает посещение accepted-участникам ЗАВЕРШЁННЫХ событий.
+
+    Посещение считается по факту завершения события, а не по факту принятия заявки
+    (иначе счётчик накручивался откликом — фундамент репутации был бы недостоверным).
+    Инкремент — по каждому событию отдельно (участник двух завершившихся получит +2).
+    """
+    if not event_ids:
+        return
+    rows = (
+        await db.execute(
+            select(Participation.user_id, func.count())
+            .where(Participation.event_id.in_(event_ids), Participation.status == "accepted")
+            .group_by(Participation.user_id)
+        )
+    ).all()
+    for user_id, n in rows:
+        await db.execute(
+            update(User).where(User.id == user_id).values(events_attended=User.events_attended + n)
+        )
+
+
 def format_time(event: Event) -> str:
     t = event.starts_at.strftime("%d.%m %H:%M UTC")
     return f"Точное время: {t}. Место: {event.address or '—'}"
@@ -72,7 +94,6 @@ async def on_accept(db: AsyncSession, event: Event, participant: User) -> None:
     try:
         conv = await chat_service.get_or_create_event_conversation(db, event)
         await chat_service.ensure_member(db, conv.id, participant.id)
-        participant.events_attended += 1
         await db.commit()
         await chat_service.post_message(
             db, conv.id, f"{participant.name} присоединился", sender_id=None, is_system=True
