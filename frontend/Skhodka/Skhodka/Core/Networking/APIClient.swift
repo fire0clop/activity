@@ -148,8 +148,31 @@ final class APIClient {
         return Date(timeIntervalSince1970: exp).timeIntervalSinceNow < leeway
     }
 
-    /// Обновление токена. true — успех.
+    /// Сериализует конкурентные обновления токена: при нескольких параллельных 401
+    /// (типичный холодный старт — лента + чаты + профиль) все ждут ОДИН in-flight refresh.
+    /// Иначе повторная ротация одноразового refresh-токена на бэке разлогинивает пользователя.
+    private actor RefreshCoordinator {
+        private var inFlight: Task<Bool, Never>?
+        func run(_ operation: @escaping () async -> Bool) async -> Bool {
+            if let task = inFlight { return await task.value }
+            let task = Task { await operation() }
+            inFlight = task
+            let result = await task.value
+            inFlight = nil
+            return result
+        }
+    }
+
+    private let refreshCoordinator = RefreshCoordinator()
+
+    /// Обновление токена (дедуплицируется через RefreshCoordinator). true — успех.
     private func refresh() async -> Bool {
+        await refreshCoordinator.run { [weak self] in
+            await self?.performRefresh() ?? false
+        }
+    }
+
+    private func performRefresh() async -> Bool {
         guard let refreshToken = tokenStore.refreshToken else { return false }
         var req = URLRequest(url: base.appendingPathComponent("auth/refresh"))
         req.httpMethod = "POST"

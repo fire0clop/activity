@@ -47,9 +47,14 @@ async def join_event(
     if part is not None and part.status in ("pending", "accepted", "waitlisted"):
         raise conflict("already_joined", "Вы уже откликнулись")
 
+    # Критическая секция: блокируем строку события, чтобы проверка «есть место» и запись
+    # статуса были атомарны относительно других join/accept/leave (иначе гонка → перебор мест).
+    locked = await matching_service.lock_event(db, event_id)
+    if locked is None:
+        raise not_found("Событие не найдено")
     count = await matching_service.accepted_count(db, event_id)
-    has_space = event.max_participants is None or count < event.max_participants
-    if event.auto_accept and has_space:
+    has_space = locked.max_participants is None or count < locked.max_participants
+    if locked.auto_accept and has_space:
         new_status = "accepted"
     elif has_space:
         new_status = "pending"
@@ -65,10 +70,12 @@ async def join_event(
             decided_at=datetime.now(UTC) if new_status == "accepted" else None,
         )
         db.add(part)
-    await db.commit()
+    if new_status == "accepted":
+        await matching_service.refresh_capacity_status(db, locked)
+    await db.commit()  # освобождает блокировку события
 
     if new_status == "accepted":
-        await matching_service.on_accept(db, event, current_user)
+        await matching_service.on_accept(db, locked, current_user)
     else:
         await push_service.send_push(
             db, event.organizer_id, "Новая заявка",
@@ -94,9 +101,8 @@ async def leave_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSess
 
     if was_accepted:
         event = await db.get(Event, event_id)
-        if event.status == "full":
-            event.status = "open"
-            await db.commit()
+        # promote_waitlist берёт блокировку события, продвигает лист ожидания и синхронизирует
+        # статус open/full под ней — ручной сброс full→open здесь больше не нужен (гонки нет).
         await matching_service.promote_waitlist(db, event)
 
 
@@ -137,7 +143,11 @@ async def _decide(participation_id: uuid.UUID, current_user: User, db: DbSession
     part = await db.get(Participation, participation_id)
     if part is None:
         raise not_found("Заявка не найдена")
-    event = await db.get(Event, part.event_id)
+    # Блокируем событие: решение о принятии и проверка лимита атомарны (иначе двойной
+    # accept/двойной клик могут превысить max_participants).
+    event = await matching_service.lock_event(db, part.event_id)
+    if event is None:
+        raise not_found("Событие не найдено")
     if event.organizer_id != current_user.id:
         raise forbidden("Только организатор может решать по заявкам")
 
@@ -147,6 +157,7 @@ async def _decide(participation_id: uuid.UUID, current_user: User, db: DbSession
             raise conflict("event_full", "Мест больше нет")
         part.status = "accepted"
         part.decided_at = datetime.now(UTC)
+        await matching_service.refresh_capacity_status(db, event)
         await db.commit()
         participant = await db.get(User, part.user_id)
         await matching_service.on_accept(db, event, participant)

@@ -1,6 +1,11 @@
 import Foundation
 
 /// Живой чат через WebSocket (backend §10). Один экземпляр на открытую беседу.
+///
+/// Изолирован `@MainActor`: `task`/`connected`/`intentionalClose`/`messages` больше не
+/// мутируются из фоновых URLSession-колбэков напрямую — все переходы идут через главный
+/// актор, что исключает гонки и «залипший» connected при обрыве/возврате из фона.
+@MainActor
 final class WebSocketClient: NSObject, ObservableObject {
     @Published var messages: [Message] = []
     @Published var onlineCount = 0
@@ -12,6 +17,8 @@ final class WebSocketClient: NSObject, ObservableObject {
     private var tokenProvider: () async -> String? = { nil }
     private var intentionalClose = false
     private let decoder = JSONDecoder()
+    /// id уже показанных сообщений — защита от дублей (history + WS + reconnect).
+    private var messageIDs: Set<String> = []
 
     private struct Envelope: Decodable {
         let type: String
@@ -34,23 +41,24 @@ final class WebSocketClient: NSObject, ObservableObject {
     /// Переоткрывает сокет, если он не активен (обрыв, возврат приложения из фона).
     func ensureConnected() {
         guard !intentionalClose, !connected else { return }
-        task?.cancel(with: .goingAway, reason: nil)
         Task { await openSocket() }
     }
 
     private func openSocket() async {
         guard let token = await tokenProvider() else {
-            await MainActor.run { self.connected = false }
+            connected = false
             return
         }
-        let url = AppConfig.wsBaseURL
-            .appendingPathComponent("ws/chat/\(conversationID)")
+        // Не плодим сокеты: гасим предыдущий перед созданием нового.
+        task?.cancel(with: .goingAway, reason: nil)
+
+        let url = AppConfig.wsBaseURL.appendingPathComponent("ws/chat/\(conversationID)")
         // Токен передаём через Sec-WebSocket-Protocol ("bearer, <jwt>"), а не в query —
         // так он не утекает в access-логи reverse-proxy. Сервер эхом выбирает "bearer".
-        let task = URLSession.shared.webSocketTask(with: url, protocols: ["bearer", token])
-        self.task = task
-        task.resume()
-        receive()
+        let socket = URLSession.shared.webSocketTask(with: url, protocols: ["bearer", token])
+        task = socket
+        socket.resume()
+        receive(on: socket)
     }
 
     func send(text: String) {
@@ -68,18 +76,31 @@ final class WebSocketClient: NSObject, ObservableObject {
         task = nil
     }
 
-    private func receive() {
-        task?.receive { [weak self] result in
-            guard let self else { return }
-            switch result {
-            case .success(let msg):
-                // Сервер сразу шлёт history — первый кадр и означает «подключены».
-                DispatchQueue.main.async { if !self.connected { self.connected = true } }
-                if case .string(let text) = msg { self.handle(text) }
-                self.receive()
-            case .failure:
-                DispatchQueue.main.async { self.connected = false }
-                self.reconnectIfNeeded()
+    /// История, догруженная по REST (fallback, если WS не поднялся). Заполняет и id-набор,
+    /// чтобы последующие WS-сообщения не задваивались.
+    func applyRESTHistory(_ items: [Message]) {
+        guard messages.isEmpty else { return }
+        messages = items
+        messageIDs = Set(items.map { $0.id })
+    }
+
+    /// Привязываем чтение к КОНКРЕТНОМУ сокету: колбэки уже заменённого соединения
+    /// игнорируются (`self.task === socket`), иначе обрыв старого сокета инициировал бы
+    /// лишний reconnect поверх актуального — источник двойных сокетов и задвоенных сообщений.
+    private nonisolated func receive(on socket: URLSessionWebSocketTask) {
+        socket.receive { [weak self] result in
+            Task { @MainActor in
+                guard let self, self.task === socket else { return }
+                switch result {
+                case .success(let msg):
+                    // Сервер сразу шлёт history — первый кадр и означает «подключены».
+                    if !self.connected { self.connected = true }
+                    if case .string(let text) = msg { self.handle(text) }
+                    self.receive(on: socket)
+                case .failure:
+                    self.connected = false
+                    self.reconnectIfNeeded()
+                }
             }
         }
     }
@@ -87,25 +108,28 @@ final class WebSocketClient: NSObject, ObservableObject {
     private func handle(_ text: String) {
         guard let data = text.data(using: .utf8),
               let env = try? decoder.decode(Envelope.self, from: data) else { return }
-        DispatchQueue.main.async {
-            switch env.type {
-            case "history":
-                self.messages = env.messages ?? []
-            case "message", "system":
-                if let m = env.message { self.messages.append(m) }
-            case "presence":
-                self.onlineCount = env.onlineUserIds?.count ?? 0
-            default:
-                break
+        switch env.type {
+        case "history":
+            let msgs = env.messages ?? []
+            messages = msgs
+            messageIDs = Set(msgs.map { $0.id })
+        case "message", "system":
+            if let m = env.message, !messageIDs.contains(m.id) {
+                messageIDs.insert(m.id)
+                messages.append(m)
             }
+        case "presence":
+            onlineCount = env.onlineUserIds?.count ?? 0
+        default:
+            break
         }
     }
 
     private func reconnectIfNeeded() {
-        guard !intentionalClose else { return }
+        guard !intentionalClose, !connected else { return }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard let self, !self.intentionalClose else { return }
+            guard let self, !self.intentionalClose, !self.connected else { return }
             await self.openSocket()
         }
     }

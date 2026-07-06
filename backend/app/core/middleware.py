@@ -19,24 +19,27 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         token = request_id_ctx.set(rid)
         start = time.perf_counter()
+        response: Response | None = None
         try:
             response = await call_next(request)
+            return response
         finally:
             duration_ms = round((time.perf_counter() - start) * 1000, 1)
-            status = locals().get("response").status_code if "response" in locals() else 500
+            # Если call_next бросил исключение, response остаётся None — логируем 500 и не
+            # трогаем response.headers (иначе UnboundLocalError затирал бы исходную ошибку).
             logger.info(
                 "request",
                 extra={
                     "method": request.method,
                     "path": request.url.path,
-                    "status": status,
+                    "status": response.status_code if response is not None else 500,
                     "duration_ms": duration_ms,
                     "client": request.client.host if request.client else "-",
                 },
             )
+            if response is not None:
+                response.headers["X-Request-ID"] = rid
             request_id_ctx.reset(token)
-        response.headers["X-Request-ID"] = rid
-        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

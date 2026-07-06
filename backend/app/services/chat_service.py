@@ -2,6 +2,7 @@ import logging
 import uuid
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conversation import Conversation, ConversationMember
@@ -18,17 +19,25 @@ logger = logging.getLogger("chat")
 async def get_or_create_event_conversation(db: AsyncSession, event: Event) -> Conversation:
     result = await db.execute(select(Conversation).where(Conversation.event_id == event.id))
     conv = result.scalar_one_or_none()
-    if conv is None:
-        conv = Conversation(
-            type="event",
-            title=event.title,
-            event_id=event.id,
-            created_by=event.organizer_id,
-        )
-        db.add(conv)
+    if conv is not None:
+        return conv
+    conv = Conversation(
+        type="event",
+        title=event.title,
+        event_id=event.id,
+        created_by=event.organizer_id,
+    )
+    db.add(conv)
+    try:
         await db.flush()
-        # организатор — владелец беседы
-        db.add(ConversationMember(conversation_id=conv.id, user_id=event.organizer_id, role="owner"))
+    except IntegrityError:
+        # Гонка: другой участник создал беседу параллельно (event_id UNIQUE) — берём существующую.
+        await db.rollback()
+        return (
+            await db.execute(select(Conversation).where(Conversation.event_id == event.id))
+        ).scalar_one()
+    # организатор — владелец беседы
+    db.add(ConversationMember(conversation_id=conv.id, user_id=event.organizer_id, role="owner"))
     return conv
 
 

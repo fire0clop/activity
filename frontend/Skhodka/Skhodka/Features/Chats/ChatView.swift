@@ -86,7 +86,7 @@ struct ChatView: View {
             let resp: MessagesResponse = try await auth.api.send(
                 Endpoint(path: "/conversations/\(conversationID)/messages"))
             // REST отдаёт newest-first; на экране — старые сверху.
-            if ws.messages.isEmpty { ws.messages = resp.items.reversed() }
+            ws.applyRESTHistory(resp.items.reversed())
         } catch {
             if ws.messages.isEmpty { historyError = "Не удалось загрузить историю. Проверьте соединение." }
         }

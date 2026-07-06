@@ -115,4 +115,43 @@ struct APIClientTests {
             Issue.record("не тот тип ошибки: \(error)")
         }
     }
+
+    @Test("Параллельные 401 -> один общий refresh (без повторной ротации токена)")
+    func dedupesConcurrentRefresh() async throws {
+        let store = TokenStore()
+        store.save(access: "old", refresh: "ref-1")
+        defer { store.clear() }
+
+        let refreshHits = LockedCounter()
+        MockURLProtocol.handler = { req in
+            let path = req.url!.path
+            if path.hasSuffix("/auth/refresh") {
+                refreshHits.increment()
+                return (200, #"{"access_token":"new","refresh_token":"ref-2","token_type":"bearer","expires_in":1800}"#)
+            }
+            let auth = req.value(forHTTPHeaderField: "Authorization") ?? ""
+            return auth == "Bearer old"
+                ? (401, #"{"error":{"code":"unauthorized","message":"истёк"}}"#)
+                : (200, #"{"ok": true}"#)
+        }
+
+        struct Ok: Decodable { let ok: Bool }
+        let client = makeClient(store: store)
+        // Два авторизованных запроса стартуют одновременно и оба ловят 401.
+        async let a: Ok = client.send(Endpoint(path: "/users/me"))
+        async let b: Ok = client.send(Endpoint(path: "/conversations"))
+        _ = try await (a, b)
+
+        // Без дедупликации было бы два refresh — второй ротировал бы уже невалидный токен.
+        #expect(refreshHits.count == 1)
+        #expect(store.refreshToken == "ref-2")
+    }
+}
+
+/// Потокобезопасный счётчик для подсчёта обращений из sync-обработчика MockURLProtocol.
+final class LockedCounter: @unchecked Sendable {
+    private var value = 0
+    private let lock = NSLock()
+    func increment() { lock.lock(); value += 1; lock.unlock() }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
 }
