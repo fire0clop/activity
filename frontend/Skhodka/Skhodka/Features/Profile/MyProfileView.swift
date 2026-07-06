@@ -6,6 +6,8 @@ struct MyProfileView: View {
     @State private var showPasswordReset = false
     @State private var fullScreen = false
     @State private var startIndex = 0
+    @State private var confirmDelete = false
+    @State private var deleteError: String?
 
     var body: some View {
         NavigationStack {
@@ -19,6 +21,10 @@ struct MyProfileView: View {
                             if !me.photoURLs.isEmpty { photos(me) }
                             statsCard(me)
                             actionsCard
+                            legalCard
+                            if let deleteError {
+                                Text(deleteError).font(.footnote).foregroundStyle(.red)
+                            }
                         }
                         Color.clear.frame(height: 20)
                     }
@@ -32,6 +38,12 @@ struct MyProfileView: View {
             }
             .sheet(isPresented: $showPasswordReset) {
                 NavigationStack { PasswordResetView(prefillPhone: auth.me?.phone ?? "", asSheet: true) }
+            }
+            .confirmationDialog("Удалить аккаунт?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Удалить навсегда", role: .destructive) { Task { await deleteAccount() } }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("Профиль, ваши события и заявки будут удалены безвозвратно. Это действие нельзя отменить.")
             }
             .task { await auth.refreshMe() }
         }
@@ -111,8 +123,46 @@ struct MyProfileView: View {
             actionRow("Сменить пароль", value: nil, icon: "lock.fill") { showPasswordReset = true }
             Divider().background(Theme.line).padding(.leading, 50)
             actionRow("Выйти", value: nil, icon: "rectangle.portrait.and.arrow.right", destructive: true) { auth.signOut() }
+            Divider().background(Theme.line).padding(.leading, 50)
+            actionRow("Удалить аккаунт", value: nil, icon: "trash.fill", destructive: true) { confirmDelete = true }
         }
         .cardStyle()
+    }
+
+    private var legalCard: some View {
+        VStack(spacing: 0) {
+            Link(destination: Legal.privacyPolicyURL) {
+                legalRow("Политика конфиденциальности", icon: "hand.raised.fill")
+            }
+            Divider().background(Theme.line).padding(.leading, 50)
+            Link(destination: Legal.termsURL) {
+                legalRow("Правила сообщества", icon: "doc.text.fill")
+            }
+        }
+        .cardStyle()
+    }
+
+    private func legalRow(_ title: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.accent).frame(width: 26)
+            Text(title).font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.ink)
+            Spacer()
+            Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(Theme.ink2)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 14)
+    }
+
+    private func deleteAccount() async {
+        deleteError = nil
+        do {
+            try await auth.api.sendVoid(Endpoint(path: "/users/me", method: .delete))
+            auth.accountDeleted()
+        } catch let err as APIError {
+            deleteError = err.message
+        } catch {
+            deleteError = "Не удалось удалить аккаунт. Попробуйте позже."
+        }
     }
 
     private func actionRow(_ title: String, value: String?, icon: String, destructive: Bool = false,

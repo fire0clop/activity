@@ -129,6 +129,8 @@ async def register(body: RegisterIn, db: DbSession, redis: RedisDep) -> Register
         db.add(user)
     user.password_hash = hash_password(body.password)
     user.is_phone_verified = True
+    # Фиксируем принятие правил/политики на момент регистрации (App Store 1.2 для UGC).
+    user.tos_accepted_version = settings.tos_version
     await db.flush()
 
     pair = await _issue_pair(db, user.id)

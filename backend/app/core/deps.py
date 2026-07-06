@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import profile_incomplete, unauthorized
+from app.core.exceptions import AppError, profile_incomplete, unauthorized
 from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.user import User
@@ -34,6 +34,8 @@ async def get_current_user(
     user = await db.get(User, user_id)
     if user is None:
         raise unauthorized("Пользователь не найден")
+    if user.is_banned:
+        raise AppError("account_banned", "Аккаунт заблокирован", 403)
     return user
 
 

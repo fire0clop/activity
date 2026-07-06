@@ -78,6 +78,14 @@ final class AuthManager: ObservableObject {
         await bootstrap()
     }
 
+    /// Локальный выход после удаления аккаунта на сервере: сетевые уведомления не нужны —
+    /// пользователя уже нет, токены и так недействительны.
+    func accountDeleted() {
+        tokenStore.clear()
+        me = nil
+        state = .signedOut
+    }
+
     // MARK: - Auth flow
 
     func requestCode(phone: String) async throws -> RequestCodeResponse {

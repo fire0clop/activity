@@ -19,3 +19,10 @@ enum AppConfig {
         return value
     }
 }
+
+/// Правовые документы (App Store Connect требует Privacy Policy; Guideline 1.2 — правила UGC).
+/// TODO(launch): заменить на реальные размещённые документы перед сабмитом в App Store.
+enum Legal {
+    static let privacyPolicyURL = URL(string: "https://skhodka.app/privacy")!
+    static let termsURL = URL(string: "https://skhodka.app/terms")!
+}

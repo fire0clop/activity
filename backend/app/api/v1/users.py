@@ -66,6 +66,22 @@ async def delete_photo(current_user: CurrentUser, db: DbSession, url: str = Quer
     return PhotosOut(photo_urls=photos)
 
 
+@router.delete("/me", status_code=204)
+async def delete_me(current_user: CurrentUser, db: DbSession) -> None:
+    """Удаление аккаунта (App Store Guideline 5.1.1(v)).
+
+    Медиа чистим из хранилища, затем физически удаляем пользователя: связанные события,
+    участия, отзывы, устройства и refresh-токены уходят каскадом (FK ondelete=CASCADE),
+    а отправленные сообщения обезличиваются (sender_id → NULL).
+    """
+    storage = get_storage()
+    for url in [current_user.avatar_url, *(current_user.photo_urls or [])]:
+        if url:
+            await storage.delete(url)
+    await db.delete(current_user)
+    await db.commit()
+
+
 @router.get("/{user_id}", response_model=UserPublic)
 async def get_user(user_id: uuid.UUID, _: CurrentUser, db: DbSession) -> UserPublic:
     user = await db.get(User, user_id)

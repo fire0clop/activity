@@ -26,6 +26,13 @@ class User(Base, UUIDPrimaryKey, TimestampMixin):
     events_attended: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Модерация: заблокированный оператором пользователь не проходит аутентификацию.
+    is_banned: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    # Версия принятых правил/политики (App Store Guideline 1.2 для UGC).
+    tos_accepted_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     @property
     def profile_completed(self) -> bool:
         """Профиль готов, когда заполнены имя, фото и «о себе» (ROADMAP §4)."""

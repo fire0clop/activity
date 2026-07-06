@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from sqlalchemy import text
 
 from app.api.v1 import (
+    admin,
     auth,
     chat,
     conversations,
@@ -47,4 +48,5 @@ api_router.include_router(conversations.router)
 api_router.include_router(reviews.router)
 api_router.include_router(reports.router)
 api_router.include_router(subscriptions.router)
+api_router.include_router(admin.router)
 api_router.include_router(chat.router)  # WebSocket /ws/chat/{conversation_id}

@@ -10,10 +10,11 @@ struct RegisterView: View {
     @State private var isLoading = false
     @State private var resendIn = 0
     @State private var errorText: String?
+    @State private var acceptedTerms = false
     @FocusState private var codeFocused: Bool
 
     private var phoneValid: Bool { phone.count >= 11 }
-    private var canRegister: Bool { code.count == 6 && password.count >= 6 }
+    private var canRegister: Bool { code.count == 6 && password.count >= 6 && acceptedTerms }
 
     var body: some View {
         ScrollView {
@@ -49,6 +50,8 @@ struct RegisterView: View {
                     }
                     .font(.footnote).disabled(resendIn > 0)
 
+                    consentRow
+
                     PrimaryButton(title: "Зарегистрироваться", isLoading: isLoading, isEnabled: canRegister) {
                         Task { await register() }
                     }
@@ -64,6 +67,26 @@ struct RegisterView: View {
         .background(Theme.paper.ignoresSafeArea())
         .navigationTitle("Регистрация")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Явное согласие с правилами и политикой (App Store Guideline 1.2 для UGC).
+    private var consentRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button { acceptedTerms.toggle() } label: {
+                Image(systemName: acceptedTerms ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 20))
+                    .foregroundStyle(acceptedTerms ? Theme.accent : Theme.ink2)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Регистрируясь, я принимаю:").font(.footnote).foregroundStyle(Theme.ink2)
+                HStack(spacing: 12) {
+                    Link("Правила сообщества", destination: Legal.termsURL).font(.footnote)
+                    Link("Политику конфиденциальности", destination: Legal.privacyPolicyURL).font(.footnote)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func sendCode() async {

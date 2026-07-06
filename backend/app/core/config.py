@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     cors_origins: str = "*"  # CSV-список доменов; "*" только для dev
 
+    # Текущая версия правил/политики, фиксируется у пользователя при регистрации.
+    tos_version: str = "1.0"
+    # Ключ модератора для /admin эндпоинтов (пусто = админ-доступ отключён).
+    admin_api_key: str = ""
+
     # Auto-create tables on startup (dev only). В проде — Alembic.
     # По умолчанию False; включается явно через AUTO_CREATE_TABLES=true в dev .env.
     auto_create_tables: bool = False
