@@ -79,9 +79,12 @@ struct ChatView: View {
         .onDisappear { ws.disconnect() }
     }
 
+    /// Пауза перед REST-фолбэком истории, если WebSocket не успел прислать history.
+    private static let historyFallbackDelayNs: UInt64 = 1_500_000_000
+
     /// Подстраховка: если WS не поднялся и history не пришла — тянем её по REST.
     private func loadHistoryFallback() async {
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        try? await Task.sleep(nanoseconds: Self.historyFallbackDelayNs)
         guard ws.messages.isEmpty, !Task.isCancelled else { return }
         do {
             let resp: MessagesResponse = try await auth.api.send(

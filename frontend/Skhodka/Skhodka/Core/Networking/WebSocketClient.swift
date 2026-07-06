@@ -7,6 +7,9 @@ import Foundation
 /// актор, что исключает гонки и «залипший» connected при обрыве/возврате из фона.
 @MainActor
 final class WebSocketClient: NSObject, ObservableObject {
+    /// Пауза перед переподключением после обрыва.
+    private static let reconnectDelayNs: UInt64 = 2_000_000_000
+
     @Published var messages: [Message] = []
     @Published var onlineCount = 0
     @Published var connected = false
@@ -133,7 +136,7 @@ final class WebSocketClient: NSObject, ObservableObject {
     private func reconnectIfNeeded() {
         guard !intentionalClose, !connected else { return }
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: Self.reconnectDelayNs)
             guard let self, !self.intentionalClose, !self.connected else { return }
             await self.openSocket()
         }

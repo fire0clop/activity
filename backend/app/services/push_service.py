@@ -31,12 +31,12 @@ def apns_enabled() -> bool:
 
 
 _apns_client = None
-_apns_lock = threading.Lock()
+_apns_lock = asyncio.Lock()  # async-контекст: не блокируем event loop threading-локом
 
 
 async def _get_apns():
     global _apns_client
-    with _apns_lock:
+    async with _apns_lock:
         if _apns_client is None:
             from aioapns import APNs
             _apns_client = APNs(

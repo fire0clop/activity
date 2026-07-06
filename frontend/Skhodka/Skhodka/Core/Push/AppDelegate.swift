@@ -1,5 +1,8 @@
+import OSLog
 import UIKit
 import UserNotifications
+
+private let pushLog = Logger(subsystem: "com.skhodka.app", category: "push")
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
@@ -16,7 +19,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("APNs registration failed: \(error.localizedDescription)")
+        pushLog.error("APNs registration failed: \(error.localizedDescription, privacy: .public)")
     }
 
     // Показ уведомления, когда приложение на переднем плане.
