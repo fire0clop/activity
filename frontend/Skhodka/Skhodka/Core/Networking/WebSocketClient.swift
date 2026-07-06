@@ -61,13 +61,18 @@ final class WebSocketClient: NSObject, ObservableObject {
         receive(on: socket)
     }
 
-    func send(text: String) {
+    /// Ставит сообщение в отправку. Возвращает false, если сокет не готов или текст не
+    /// сериализовался — тогда вызывающий НЕ должен очищать поле ввода (иначе текст теряется).
+    @discardableResult
+    func send(text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return false }
         let payload = ["type": "message", "text": trimmed]
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              let str = String(data: data, encoding: .utf8) else { return }
-        task?.send(.string(str)) { _ in }
+              let str = String(data: data, encoding: .utf8) else { return false }
+        guard let task, connected else { return false }
+        task.send(.string(str)) { _ in }
+        return true
     }
 
     func disconnect() {

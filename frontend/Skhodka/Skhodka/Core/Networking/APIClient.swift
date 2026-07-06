@@ -68,6 +68,26 @@ final class APIClient {
         return try Self.decoder.decode(T.self, from: data)
     }
 
+    /// Best-effort уведомление бэка о выходе: отвязать устройство и погасить refresh-токен.
+    /// Использует ЗАХВАЧЕННЫЕ токены (не читает tokenStore) и не участвует в refresh —
+    /// чтобы не затронуть возможный новый вход, начавшийся сразу после signOut.
+    func bestEffortSignOut(refresh: String?, accessToken: String?, deviceToken: String?) async {
+        if let deviceToken, let accessToken,
+           let encoded = deviceToken.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) {
+            var req = URLRequest(url: base.appendingPathComponent("devices/\(encoded)"))
+            req.httpMethod = "DELETE"
+            req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            _ = try? await session.data(for: req)
+        }
+        if let refresh {
+            var req = URLRequest(url: base.appendingPathComponent("auth/logout"))
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONEncoder().encode(["refresh_token": refresh])
+            _ = try? await session.data(for: req)
+        }
+    }
+
     // MARK: - Internal
 
     private func rawSend(_ endpoint: Endpoint, retryOn401: Bool) async throws -> Data {

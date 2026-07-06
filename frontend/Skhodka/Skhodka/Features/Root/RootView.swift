@@ -15,10 +15,41 @@ struct RootView: View {
                 OnboardingView()
             case .signedIn:
                 MainTabView()
+            case .offline:
+                OfflineView { await auth.retry() }
             }
         }
         .tint(Theme.accent)
         .preferredColorScheme(.light)
+    }
+}
+
+/// Сессия жива, но бэк/сеть недоступны — предлагаем повторить, не разлогинивая.
+struct OfflineView: View {
+    var retry: () async -> Void
+    @State private var isRetrying = false
+
+    var body: some View {
+        ZStack {
+            Theme.paper.ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "wifi.slash").font(.system(size: 44)).foregroundStyle(Theme.ink2)
+                Text("Нет соединения").font(.serifTitle(22)).foregroundStyle(Theme.ink)
+                Text("Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.")
+                    .font(.subheadline).foregroundStyle(Theme.ink2)
+                    .multilineTextAlignment(.center).padding(.horizontal, 40)
+                Button {
+                    Task { isRetrying = true; await retry(); isRetrying = false }
+                } label: {
+                    Text(isRetrying ? "Проверяем…" : "Повторить")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(maxWidth: 220, minHeight: 48)
+                        .background(Theme.accent).foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(isRetrying)
+            }
+        }
     }
 }
 

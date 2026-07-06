@@ -70,8 +70,13 @@ struct CreateGroupView: View {
     private func loadCandidates() async {
         isLoading = true
         defer { isLoading = false }
-        guard let list: ConversationListResponse =
-                try? await auth.api.send(Endpoint(path: "/conversations")) else { return }
+        let list: ConversationListResponse
+        do {
+            list = try await auth.api.send(Endpoint(path: "/conversations"))
+            errorText = nil
+        } catch let err as APIError { errorText = err.message; return }
+        catch { errorText = "Не удалось загрузить список. Проверьте соединение."; return }
+
         var seen: [String: UserPublic] = [:]
         for conv in list.items.prefix(20) {
             if let detail: ConversationDetail =

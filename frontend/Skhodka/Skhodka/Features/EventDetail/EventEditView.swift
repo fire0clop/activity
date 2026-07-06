@@ -136,24 +136,35 @@ struct EventEditView: View {
     }
 
     private func addPhoto(_ item: PhotosPickerItem?) async {
+        defer { newPhoto = nil }
         guard let item, let data = try? await item.loadTransferable(type: Data.self),
               let img = UIImage(data: data), let jpeg = img.jpegData(compressionQuality: 0.85) else { return }
-        if let resp: PhotosResponse = try? await auth.api.upload(
-            path: "/events/\(event.id)/photos", fileData: jpeg, fileName: "photo.jpg", mimeType: "image/jpeg") {
+        errorText = nil
+        do {
+            let resp: PhotosResponse = try await auth.api.upload(
+                path: "/events/\(event.id)/photos", fileData: jpeg, fileName: "photo.jpg", mimeType: "image/jpeg")
             photos = resp.photoURLs; onChanged()
-        }
-        newPhoto = nil
+        } catch let err as APIError { errorText = err.message }
+        catch { errorText = "Не удалось загрузить фото" }
     }
 
     private func removePhoto(_ url: String) async {
-        if let resp: PhotosResponse = try? await auth.api.send(Endpoint(
-            path: "/events/\(event.id)/photos", method: .delete, query: ["url": url])) {
+        errorText = nil
+        do {
+            let resp: PhotosResponse = try await auth.api.send(Endpoint(
+                path: "/events/\(event.id)/photos", method: .delete, query: ["url": url]))
             photos = resp.photoURLs; onChanged()
-        }
+        } catch let err as APIError { errorText = err.message }
+        catch { errorText = "Не удалось удалить фото" }
     }
 
     private func deleteEvent() async {
-        try? await auth.api.sendVoid(Endpoint(path: "/events/\(event.id)", method: .delete))
-        onChanged(); dismiss()
+        isLoading = true; errorText = nil
+        defer { isLoading = false }
+        do {
+            try await auth.api.sendVoid(Endpoint(path: "/events/\(event.id)", method: .delete))
+            onChanged(); dismiss()
+        } catch let err as APIError { errorText = err.message }
+        catch { errorText = "Не удалось удалить событие" }
     }
 }

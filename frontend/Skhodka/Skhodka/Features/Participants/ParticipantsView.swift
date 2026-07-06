@@ -6,9 +6,13 @@ struct ParticipantsView: View {
     @State private var pending: [ParticipantItem] = []
     @State private var accepted: [ParticipantItem] = []
     @State private var isLoading = true
+    @State private var errorText: String?
 
     var body: some View {
         List {
+            if let errorText {
+                Text(errorText).font(.footnote).foregroundStyle(.red)
+            }
             if !pending.isEmpty {
                 Section("Заявки") {
                     ForEach(pending) { p in
@@ -52,17 +56,25 @@ struct ParticipantsView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        async let p: ParticipantsResponse? = try? auth.api.send(Endpoint(
-            path: "/events/\(eventID)/participants", query: ["status": "pending"]))
-        async let a: ParticipantsResponse? = try? auth.api.send(Endpoint(
-            path: "/events/\(eventID)/participants", query: ["status": "accepted"]))
-        pending = (await p)?.items ?? []
-        accepted = (await a)?.items ?? []
+        do {
+            async let p: ParticipantsResponse = auth.api.send(Endpoint(
+                path: "/events/\(eventID)/participants", query: ["status": "pending"]))
+            async let a: ParticipantsResponse = auth.api.send(Endpoint(
+                path: "/events/\(eventID)/participants", query: ["status": "accepted"]))
+            let (pr, ar) = try await (p, a)
+            pending = pr.items; accepted = ar.items
+            errorText = nil
+        } catch let err as APIError { errorText = err.message }
+        catch { errorText = "Не удалось загрузить участников. Проверьте соединение." }
     }
 
     private func decide(_ p: ParticipantItem, accept: Bool) async {
+        errorText = nil
         let path = "/participations/\(p.participationID)/\(accept ? "accept" : "reject")"
-        let _: JoinResponse? = try? await auth.api.send(Endpoint(path: path, method: .post))
-        await load()
+        do {
+            let _: JoinResponse = try await auth.api.send(Endpoint(path: path, method: .post))
+            await load()
+        } catch let err as APIError { errorText = err.message }
+        catch { errorText = "Не удалось обработать заявку. Попробуйте ещё раз." }
     }
 }

@@ -224,17 +224,19 @@ struct EventDetailView: View {
                 if e.isOrganizer {
                     NavigationLink { ParticipantsView(eventID: e.id) } label: { ctaLabel("Управлять участниками", filled: true) }
                 } else {
-                    switch e.myParticipation?.status {
-                    case "accepted":
+                    switch ParticipationStatus(raw: e.myParticipation?.status) {
+                    case .accepted:
                         if let cid = e.conversationID {
                             NavigationLink {
                                 ChatView(conversationID: cid, title: e.title,
                                          isArchived: e.status == "finished")
                             } label: { ctaLabel("Вы участвуете · открыть чат", filled: true) }
                         } else { ctaLabel("Вы участвуете ✓", filled: false) }
-                    case "pending": ctaLabel("Заявка отправлена", filled: false)
-                    case "waitlisted": ctaLabel("Вы в листе ожидания", filled: false)
-                    default:
+                    case .pending: ctaLabel("Заявка отправлена", filled: false)
+                    case .waitlisted: ctaLabel("Вы в листе ожидания", filled: false)
+                    case .rejected, .cancelled, .unknown:
+                        // Отклонённый/отменивший может откликнуться снова (бэк это допускает);
+                        // .unknown (нет заявки или новый статус) — тоже показываем отклик.
                         Button { Task { await join() } } label: { ctaLabel(actionLoading ? "…" : "Откликнуться", filled: true) }
                     }
                 }

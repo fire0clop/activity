@@ -41,10 +41,11 @@ struct ChatView: View {
                     TextField("Сообщение…", text: $draft, axis: .vertical)
                         .textFieldStyle(.roundedBorder).lineLimit(1...4)
                     Button {
-                        ws.send(text: draft)
-                        draft = ""
+                        // Очищаем поле только если сообщение реально ушло в сокет —
+                        // иначе при обрыве текст молча пропадал бы.
+                        if ws.send(text: draft) { draft = "" }
                     } label: { Image(systemName: "paperplane.fill") }
-                        .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(!ws.connected || draft.trimmingCharacters(in: .whitespaces).isEmpty)
                         .accessibilityLabel("Отправить сообщение")
                 }
                 .padding(8)

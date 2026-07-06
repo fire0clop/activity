@@ -9,6 +9,7 @@ final class AuthManager: ObservableObject {
         case signedOut      // нужен вход
         case onboarding     // вошёл, но профиль не заполнен (фото+имя+«о себе»)
         case signedIn       // полный доступ
+        case offline        // токены целы, но бэк/сеть недоступны — не разлогиниваем
     }
 
     @Published private(set) var state: State = .loading
@@ -65,9 +66,16 @@ final class AuthManager: ObservableObject {
         } catch let err as APIError where err.isCode(.unauthorized) {
             signOut()
         } catch {
-            // сеть недоступна — оставляем гостем, чтобы дать возможность войти заново
-            state = .signedOut
+            // Сеть/сервер недоступны, но токены целы — показываем экран «оффлайн»
+            // с повтором, а не выкидываем пользователя на логин. Токены не трогаем.
+            state = tokenStore.hasSession ? .offline : .signedOut
         }
+    }
+
+    /// Повторная попытка после экрана «оффлайн».
+    func retry() async {
+        state = .loading
+        await bootstrap()
     }
 
     // MARK: - Auth flow
@@ -110,16 +118,19 @@ final class AuthManager: ObservableObject {
     }
 
     func signOut() {
-        if let refresh = tokenStore.refreshToken {
-            Task {
-                try? await api.sendVoid(Endpoint(
-                    path: "/auth/logout", method: .post,
-                    body: RefreshBody(refresh_token: refresh), requiresAuth: false
-                ))
-            }
-        }
+        // Захватываем токены/устройство ДО очистки, чтобы уведомить бэк валидными данными.
+        let refresh = tokenStore.refreshToken
+        let access = tokenStore.accessToken
+        let deviceToken = PushCenter.shared.apnsToken
+        // Локальное состояние чистим сразу и синхронно — UI реагирует мгновенно, и никакой
+        // отложенный clear() не затрёт токены, если пользователь тут же войдёт снова.
         tokenStore.clear()
         me = nil
         state = .signedOut
+        // Best-effort уведомление бэка захваченными значениями: не читает tokenStore и
+        // не участвует в refresh, поэтому не мешает новому входу.
+        Task { [api] in
+            await api.bestEffortSignOut(refresh: refresh, accessToken: access, deviceToken: deviceToken)
+        }
     }
 }

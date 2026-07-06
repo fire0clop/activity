@@ -146,6 +146,21 @@ struct APIClientTests {
         #expect(refreshHits.count == 1)
         #expect(store.refreshToken == "ref-2")
     }
+
+    @Test("bestEffortSignOut отвязывает устройство (с токеном) и гасит refresh")
+    func bestEffortSignOutCleansUp() async {
+        MockURLProtocol.handler = { _ in (204, "") }
+        let client = makeClient()
+
+        await client.bestEffortSignOut(refresh: "ref-1", accessToken: "acc-1", deviceToken: "devtok")
+
+        let paths = MockURLProtocol.requests.map { $0.url!.path }
+        #expect(paths.contains { $0.hasSuffix("/devices/devtok") })
+        #expect(paths.contains { $0.hasSuffix("/auth/logout") })
+        // Отвязка устройства несёт захваченный access-токен, а не из очищенного store.
+        let deviceReq = MockURLProtocol.requests.first { $0.url!.path.hasSuffix("/devices/devtok") }
+        #expect(deviceReq?.value(forHTTPHeaderField: "Authorization") == "Bearer acc-1")
+    }
 }
 
 /// Потокобезопасный счётчик для подсчёта обращений из sync-обработчика MockURLProtocol.

@@ -1,5 +1,16 @@
 import Foundation
 
+/// Статус участия. Строку с бэка приводим к типу через `init(raw:)` с безопасным
+/// `.unknown` — новый статус на сервере не роняет декодирование и обрабатывается явно.
+enum ParticipationStatus: String {
+    case pending, accepted, waitlisted, rejected, cancelled
+    case unknown
+
+    init(raw: String?) {
+        self = raw.flatMap { ParticipationStatus(rawValue: $0) } ?? .unknown
+    }
+}
+
 struct JoinResponse: Decodable {
     let status: String
 }
