@@ -165,4 +165,5 @@ struct CreateEventBody: Encodable {
     let price: Double?
     let price_split: String
     let auto_accept: Bool
+    var recurrence: String = "none"   // none | weekly
 }

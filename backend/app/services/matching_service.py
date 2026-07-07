@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,6 +78,41 @@ async def mark_attended(db: AsyncSession, event_ids: list[uuid.UUID]) -> None:
         await db.execute(
             update(User).where(User.id == user_id).values(events_attended=User.events_attended + n)
         )
+
+
+async def clone_recurring_event(db: AsyncSession, event: Event) -> Event | None:
+    """Создаёт следующее вхождение повторяющегося события (через неделю). Вызывать при
+    завершении исходного. Организатор сразу добавляется accepted-участником (как при создании)."""
+    if event.recurrence != "weekly":
+        return None
+    clone = Event(
+        organizer_id=event.organizer_id,
+        title=event.title,
+        description=event.description,
+        category=event.category,
+        starts_at=event.starts_at + timedelta(days=7),
+        ends_at=event.ends_at + timedelta(days=7) if event.ends_at else None,
+        location=func.ST_SetSRID(func.ST_MakePoint(event.longitude, event.latitude), 4326),
+        latitude=event.latitude,
+        longitude=event.longitude,
+        address=event.address,
+        map_url=event.map_url,
+        min_participants=event.min_participants,
+        max_participants=event.max_participants,
+        photo_urls=list(event.photo_urls or []),
+        price=event.price,
+        price_split=event.price_split,
+        cover_url=event.cover_url,
+        auto_accept=event.auto_accept,
+        recurrence="weekly",
+        status="open",
+    )
+    db.add(clone)
+    await db.flush()
+    db.add(Participation(
+        event_id=clone.id, user_id=event.organizer_id, status="accepted", decided_at=datetime.now(UTC),
+    ))
+    return clone
 
 
 def format_time(event: Event) -> str:

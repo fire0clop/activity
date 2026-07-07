@@ -63,6 +63,11 @@ class Event(Base, UUIDPrimaryKey, TimestampMixin):
     cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
     auto_accept: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # recurrence: none | weekly — при завершении создаётся следующее вхождение.
+    recurrence: Mapped[str] = mapped_column(
+        String(16), default="none", server_default="none", nullable=False
+    )
+
     # status: open | full | closed | cancelled | finished
     status: Mapped[str] = mapped_column(String(16), default="open", index=True, nullable=False)
 

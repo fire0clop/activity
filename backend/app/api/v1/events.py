@@ -120,6 +120,7 @@ async def create_event(
         price=body.price,
         price_split=body.price_split,
         auto_accept=body.auto_accept,
+        recurrence=body.recurrence,
         status="open",
     )
     db.add(event)
@@ -363,6 +364,7 @@ async def finish_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSes
     # Посещение засчитываем один раз — при первом переводе в finished.
     if not already_finished:
         await matching_service.mark_attended(db, [event.id])
+        await matching_service.clone_recurring_event(db, event)  # следующее вхождение (weekly)
     await db.commit()
     await db.refresh(event)
 

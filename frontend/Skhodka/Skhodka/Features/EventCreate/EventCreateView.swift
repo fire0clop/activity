@@ -18,6 +18,7 @@ struct EventCreateView: View {
     @State private var maxParticipants = 4
     @State private var price = ""
     @State private var autoAccept = false
+    @State private var repeatWeekly = false
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var photoImages: [UIImage] = []
     @State private var isLoading = false
@@ -74,6 +75,7 @@ struct EventCreateView: View {
                     Stepper("Максимум: \(maxParticipants)", value: $maxParticipants, in: 2...100)
                 }
                 Toggle("Авто-приём первых", isOn: $autoAccept)
+                Toggle("Повторять еженедельно", isOn: $repeatWeekly)
                 TextField("Стоимость, ₽ (опционально)", text: $price).keyboardType(.numberPad)
             }
             Section("Фото (до 5)") {
@@ -166,7 +168,8 @@ struct EventCreateView: View {
             max_participants: unlimited ? nil : maxParticipants,
             price: Double(price),
             price_split: price.isEmpty ? "free" : "shared",
-            auto_accept: autoAccept
+            auto_accept: autoAccept,
+            recurrence: repeatWeekly ? "weekly" : "none"
         )
         do {
             let created: EventDetail = try await auth.api.send(Endpoint(

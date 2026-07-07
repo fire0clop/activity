@@ -23,6 +23,7 @@ class EventCreateIn(BaseModel):
     price: float | None = None
     price_split: str = Field(default="free", pattern="^(free|per_person|shared)$")
     auto_accept: bool = False
+    recurrence: str = Field(default="none", pattern="^(none|weekly)$")
 
     @model_validator(mode="after")
     def _check(self) -> "EventCreateIn":

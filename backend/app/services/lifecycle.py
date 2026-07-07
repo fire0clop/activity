@@ -42,6 +42,15 @@ async def _sweep_once() -> int:
         ).scalars().all()
         if not rows:
             return 0
+        # Клонируем повторяющиеся ДО смены статуса (нужны исходные данные события).
+        recurring = (
+            await db.execute(
+                select(Event).where(Event.id.in_(rows), Event.recurrence == "weekly")
+            )
+        ).scalars().all()
+        for ev in recurring:
+            await matching_service.clone_recurring_event(db, ev)
+
         await db.execute(update(Event).where(Event.id.in_(rows)).values(status="finished"))
         await db.execute(
             update(Conversation).where(Conversation.event_id.in_(rows)).values(is_archived=True)
