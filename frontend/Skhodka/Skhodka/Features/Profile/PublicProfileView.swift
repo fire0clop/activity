@@ -1,5 +1,7 @@
 import SwiftUI
 
+private struct FollowStatus: Decodable { let following: Bool }
+
 struct PublicProfileView: View {
     let userID: String
     @EnvironmentObject var auth: AuthManager
@@ -8,6 +10,7 @@ struct PublicProfileView: View {
     @State private var showReport = false
     @State private var showBlockConfirm = false
     @State private var isBlocked = false
+    @State private var isFollowing = false
     @State private var statusText: String?
     @State private var actionError: String?
     @State private var loadError: String?
@@ -110,6 +113,15 @@ struct PublicProfileView: View {
 
             if u.id != auth.me?.id {
                 VStack(spacing: 10) {
+                    Button { Task { await toggleFollow() } } label: {
+                        Label(isFollowing ? "Вы подписаны" : "Подписаться на автора",
+                              systemImage: isFollowing ? "bell.fill" : "bell")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .background(isFollowing ? Theme.accentSoft : Theme.accent)
+                            .foregroundStyle(isFollowing ? Theme.accent : .white)
+                            .clipShape(Capsule())
+                    }
                     Button(role: .destructive) { showReport = true } label: {
                         Label("Пожаловаться", systemImage: "exclamationmark.bubble")
                     }
@@ -155,6 +167,23 @@ struct PublicProfileView: View {
         if let resp: ReviewsResponse = try? await auth.api.send(Endpoint(path: "/users/\(userID)/reviews")) {
             reviews = resp.items
         }
+        if userID != auth.me?.id,
+           let st: FollowStatus = try? await auth.api.send(
+               Endpoint(path: "/users/\(userID)/follow-status")) {
+            isFollowing = st.following
+        }
+    }
+
+    private func toggleFollow() async {
+        actionError = nil
+        let target = !isFollowing
+        do {
+            try await auth.api.sendVoid(Endpoint(
+                path: "/users/\(userID)/follow", method: target ? .post : .delete))
+            isFollowing = target
+            Haptics.tap()
+        } catch let err as APIError { actionError = err.message }
+        catch { actionError = "Не удалось изменить подписку. Проверьте соединение." }
     }
 
     private func report(_ reason: String) async {

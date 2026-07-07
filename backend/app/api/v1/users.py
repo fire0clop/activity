@@ -1,9 +1,11 @@
 import uuid
 
 from fastapi import APIRouter, File, Query, UploadFile
+from sqlalchemy import select
 
 from app.core.deps import CurrentUser, DbSession
 from app.core.exceptions import AppError, not_found
+from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.event import PhotosOut
 from app.schemas.user import UpdateProfileIn, UserPrivate, UserPublic
@@ -88,3 +90,39 @@ async def get_user(user_id: uuid.UUID, _: CurrentUser, db: DbSession) -> UserPub
     if user is None:
         raise not_found("Пользователь не найден")
     return UserPublic.from_model(user)
+
+
+async def _find_follow(db: DbSession, follower_id: uuid.UUID, organizer_id: uuid.UUID) -> Subscription | None:
+    return (
+        await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == follower_id,
+                Subscription.target_organizer_id == organizer_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+@router.post("/{user_id}/follow", status_code=204)
+async def follow_user(user_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> None:
+    """Подписаться на организатора — пуш о любом его новом событии."""
+    if user_id == current_user.id:
+        raise AppError("validation_error", "Нельзя подписаться на себя", 422)
+    if await db.get(User, user_id) is None:
+        raise not_found("Пользователь не найден")
+    if await _find_follow(db, current_user.id, user_id) is None:  # идемпотентно
+        db.add(Subscription(user_id=current_user.id, target_organizer_id=user_id))
+        await db.commit()
+
+
+@router.delete("/{user_id}/follow", status_code=204)
+async def unfollow_user(user_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> None:
+    sub = await _find_follow(db, current_user.id, user_id)
+    if sub is not None:
+        await db.delete(sub)
+        await db.commit()
+
+
+@router.get("/{user_id}/follow-status")
+async def follow_status(user_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> dict:
+    return {"following": await _find_follow(db, current_user.id, user_id) is not None}

@@ -24,7 +24,10 @@ def _out(sub: Subscription) -> SubscriptionOut:
 async def list_subscriptions(current_user: CurrentUser, db: DbSession) -> SubscriptionsOut:
     subs = (
         await db.execute(
-            select(Subscription).where(Subscription.user_id == current_user.id)
+            select(Subscription).where(
+                Subscription.user_id == current_user.id,
+                Subscription.target_organizer_id.is_(None),  # follow'ы — через /users/{id}/follow
+            )
             .order_by(Subscription.created_at)
         )
     ).scalars().all()

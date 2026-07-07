@@ -3,7 +3,7 @@
 import logging
 
 from geoalchemy2 import Geography
-from sqlalchemy import cast, func, or_, select
+from sqlalchemy import and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event import Event
@@ -34,19 +34,24 @@ async def notify_subscribers(db: AsyncSession, event: Event) -> int:
         Subscription.latitude.is_(None),
         func.ST_DWithin(sub_point, event_point, Subscription.radius_km * 1000),
     )
+    if event.category is not None:
+        category_ok = (Subscription.category.is_(None)) | (Subscription.category == event.category)
+    else:
+        category_ok = Subscription.category.is_(None)
+
+    # Матч: подписка на этого организатора ЛИБО критерий-подписка (категория+гео) по событию.
+    organizer_follow = Subscription.target_organizer_id == event.organizer_id
+    criteria = and_(Subscription.target_organizer_id.is_(None), category_ok, geo_ok)
 
     query = (
         select(Subscription.user_id)
-        .where(Subscription.user_id != event.organizer_id, geo_ok)
+        .where(
+            Subscription.user_id != event.organizer_id,
+            or_(organizer_follow, criteria),
+        )
         .distinct()
         .limit(MAX_NOTIFICATIONS_PER_EVENT)
     )
-    if event.category is not None:
-        query = query.where(
-            (Subscription.category.is_(None)) | (Subscription.category == event.category)
-        )
-    else:
-        query = query.where(Subscription.category.is_(None))
 
     user_ids = (await db.execute(query)).scalars().all()
     for user_id in user_ids:

@@ -7,7 +7,7 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKey
 
 
 class Subscription(Base, UUIDPrimaryKey, TimestampMixin):
-    """Подписка на новые события: по категории, по гео-области или по обоим сразу.
+    """Подписка на новые события: по категории, по гео-области или на конкретного организатора.
 
     Хотя бы один критерий обязателен (проверяется и в схеме, и констрейнтом).
     """
@@ -15,7 +15,9 @@ class Subscription(Base, UUIDPrimaryKey, TimestampMixin):
     __tablename__ = "subscriptions"
     __table_args__ = (
         CheckConstraint(
-            "category IS NOT NULL OR (latitude IS NOT NULL AND longitude IS NOT NULL)",
+            "category IS NOT NULL "
+            "OR (latitude IS NOT NULL AND longitude IS NOT NULL) "
+            "OR target_organizer_id IS NOT NULL",
             name="ck_subscriptions_has_criterion",
         ),
         CheckConstraint(
@@ -31,3 +33,7 @@ class Subscription(Base, UUIDPrimaryKey, TimestampMixin):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     radius_km: Mapped[float] = mapped_column(Float, default=10, nullable=False)
+    # Подписка на конкретного организатора: пуш о любом его новом событии.
+    target_organizer_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
+    )
