@@ -3,7 +3,7 @@ from datetime import UTC, datetime, time, timedelta
 
 from fastapi import APIRouter, File, Query, UploadFile, status
 from geoalchemy2 import Geography
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import String, cast, func, or_, select, tuple_
 
 from app.core.config import settings
 from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
@@ -21,7 +21,7 @@ from app.schemas.event import (
 )
 from app.schemas.user import UserBrief
 from app.services import event_service, matching_service
-from app.services.pagination import decode_cursor, encode_cursor
+from app.services.pagination import decode_keyset, encode_keyset
 from app.services.rate_limit import check_user_action
 from app.services.storage_service import get_storage
 
@@ -201,13 +201,15 @@ async def list_events(
             | cast(Event.description, String).ilike(like, escape="\\")
         )
 
-    offset = decode_cursor(cursor)
+    keyset = decode_keyset(cursor)
+    if keyset is not None:
+        last_starts_at, last_id = keyset
+        filters.append(tuple_(Event.starts_at, Event.id) > (last_starts_at, last_id))
     stmt = (
         select(Event, User, distance_m, accepted_sq.label("cnt"), my_status_sq.label("my"))
         .join(User, User.id == Event.organizer_id)
         .where(func.ST_DWithin(Event.location, point, radius_km * 1000), *filters)
-        .order_by(Event.starts_at.asc())
-        .offset(offset)
+        .order_by(Event.starts_at.asc(), Event.id.asc())
         .limit(limit + 1)
     )
 
@@ -223,7 +225,7 @@ async def list_events(
         )
         for event, organizer, distance, cnt, my in rows
     ]
-    next_cursor = encode_cursor(offset + limit) if has_more else None
+    next_cursor = encode_keyset(rows[-1][0].starts_at, rows[-1][0].id) if has_more else None
 
     # Холодный старт: если в радиусе пусто (первая страница) — подсказываем ближайший
     # радиус, где события есть, чтобы пользователь в пустом городе не видел только заглушку.
