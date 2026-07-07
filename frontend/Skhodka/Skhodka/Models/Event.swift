@@ -128,9 +128,14 @@ struct EventDetail: Decodable, Identifiable {
 struct EventListResponse: Decodable {
     let items: [EventListItem]
     let nextCursor: String?
+    // Холодный старт: если в радиусе пусто — ближайший радиус с событиями.
+    let suggestedRadiusKm: Double?
+    let suggestedCount: Int?
     private enum CodingKeys: String, CodingKey {
         case items
         case nextCursor = "next_cursor"
+        case suggestedRadiusKm = "suggested_radius_km"
+        case suggestedCount = "suggested_count"
     }
 }
 

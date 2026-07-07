@@ -98,3 +98,6 @@ class PhotosOut(BaseModel):
 class EventListOut(BaseModel):
     items: list[EventListItem]
     next_cursor: str | None
+    # Холодный старт: если в запрошенном радиусе пусто — ближайший радиус с событиями.
+    suggested_radius_km: float | None = None
+    suggested_count: int | None = None

@@ -233,12 +233,38 @@ struct FeedView: View {
             Text("Рядом пока тихо").font(.serifTitle(22, weight: .bold)).foregroundStyle(Theme.ink)
             Text("Стань первым — придумай движуху,\nи к тебе подтянутся.")
                 .font(.subheadline).foregroundStyle(Theme.ink2).multilineTextAlignment(.center)
+
+            // Холодный старт: если чуть дальше есть события — предлагаем расширить радиус.
+            if let radius = vm.suggestedRadiusKm, let count = vm.suggestedCount {
+                VStack(spacing: 8) {
+                    Text("В радиусе \(Int(radius)) км уже есть \(count) \(eventsWord(count)).")
+                        .font(.footnote).foregroundStyle(Theme.ink2).multilineTextAlignment(.center)
+                    Button {
+                        vm.expandRadius(); Haptics.tap()
+                    } label: {
+                        Text("Показать их").font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .padding(.horizontal, 18).padding(.vertical, 10)
+                            .background(Theme.accentSoft).clipShape(Capsule())
+                    }
+                }
+                .padding(.top, 4)
+            }
+
             NavigationLink { EventCreateView() } label: {
                 Text("Создать событие").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
                     .padding(.horizontal, 22).padding(.vertical, 13).background(Theme.accent).clipShape(Capsule())
             }
         }
         .frame(maxWidth: .infinity).padding(.top, 50)
+    }
+
+    /// Склонение слова «событие» для чисел (1 событие, 3 события, 5 событий).
+    private func eventsWord(_ n: Int) -> String {
+        let mod10 = n % 10, mod100 = n % 100
+        if mod10 == 1 && mod100 != 11 { return "событие" }
+        if (2...4).contains(mod10) && !(12...14).contains(mod100) { return "события" }
+        return "событий"
     }
 }
 

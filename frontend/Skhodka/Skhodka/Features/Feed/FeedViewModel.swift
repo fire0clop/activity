@@ -13,6 +13,9 @@ final class FeedViewModel: ObservableObject {
     @Published var items: [EventListItem] = []
     @Published var isLoading = false
     @Published var errorText: String?
+    /// Холодный старт: подсказка расширить радиус, когда рядом пусто.
+    @Published private(set) var suggestedRadiusKm: Double?
+    @Published private(set) var suggestedCount: Int?
 
     // Фильтры
     @Published var when: String?        // nil | today | tomorrow | weekend
@@ -68,6 +71,13 @@ final class FeedViewModel: ObservableObject {
         Task { await refresh() }
     }
 
+    /// Холодный старт: расширить радиус до подсказанного и перезагрузить.
+    func expandRadius() {
+        guard let suggested = suggestedRadiusKm else { return }
+        radiusKm = suggested
+        Task { await refresh() }
+    }
+
     func refresh() async {
         nextCursor = nil
         await load(reset: true)
@@ -98,6 +108,10 @@ final class FeedViewModel: ObservableObject {
             ))
             items = reset ? resp.items : items + resp.items
             nextCursor = resp.nextCursor
+            if reset {
+                suggestedRadiusKm = resp.suggestedRadiusKm
+                suggestedCount = resp.suggestedCount
+            }
         } catch let err as APIError {
             errorText = err.message
         } catch {

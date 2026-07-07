@@ -178,37 +178,38 @@ async def list_events(
         .scalar_subquery()
     )
 
-    stmt = (
-        select(Event, User, distance_m, accepted_sq.label("cnt"), my_status_sq.label("my"))
-        .join(User, User.id == Event.organizer_id)
-        .where(func.ST_DWithin(Event.location, point, radius_km * 1000))
-        .where(Event.status.in_(["open", "full"]))
-    )
-
+    # Фильтры (кроме радиуса) собираем в список — переиспользуем в пробе большего радиуса.
+    filters = [Event.status.in_(["open", "full"])]
     blocked = await matching_service.blocked_user_ids(db, current_user.id)
     if blocked:
-        stmt = stmt.where(Event.organizer_id.notin_(blocked))
-
+        filters.append(Event.organizer_id.notin_(blocked))
     if when:
         w_from, w_to = _when_range(when)
-        stmt = stmt.where(Event.starts_at >= w_from, Event.starts_at < w_to)
+        filters += [Event.starts_at >= w_from, Event.starts_at < w_to]
     if date_from:
-        stmt = stmt.where(Event.starts_at >= date_from)
+        filters.append(Event.starts_at >= date_from)
     if date_to:
-        stmt = stmt.where(Event.starts_at < date_to)
+        filters.append(Event.starts_at < date_to)
     if category:
-        stmt = stmt.where(Event.category == category)
+        filters.append(Event.category == category)
     if query:
         # Экранируем спецсимволы LIKE, чтобы '%' и '_' в запросе искались буквально.
         escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         like = f"%{escaped}%"
-        stmt = stmt.where(
+        filters.append(
             Event.title.ilike(like, escape="\\")
             | cast(Event.description, String).ilike(like, escape="\\")
         )
 
     offset = decode_cursor(cursor)
-    stmt = stmt.order_by(Event.starts_at.asc()).offset(offset).limit(limit + 1)
+    stmt = (
+        select(Event, User, distance_m, accepted_sq.label("cnt"), my_status_sq.label("my"))
+        .join(User, User.id == Event.organizer_id)
+        .where(func.ST_DWithin(Event.location, point, radius_km * 1000), *filters)
+        .order_by(Event.starts_at.asc())
+        .offset(offset)
+        .limit(limit + 1)
+    )
 
     rows = (await db.execute(stmt)).all()
     has_more = len(rows) > limit
@@ -223,7 +224,31 @@ async def list_events(
         for event, organizer, distance, cnt, my in rows
     ]
     next_cursor = encode_cursor(offset + limit) if has_more else None
-    return EventListOut(items=items, next_cursor=next_cursor)
+
+    # Холодный старт: если в радиусе пусто (первая страница) — подсказываем ближайший
+    # радиус, где события есть, чтобы пользователь в пустом городе не видел только заглушку.
+    suggested_radius_km: float | None = None
+    suggested_count: int | None = None
+    if not items and cursor is None:
+        for probe in (50.0, 200.0, 500.0):
+            if probe <= radius_km:
+                continue
+            n = (
+                await db.execute(
+                    select(func.count()).select_from(Event).where(
+                        func.ST_DWithin(Event.location, point, probe * 1000), *filters
+                    )
+                )
+            ).scalar() or 0
+            if n > 0:
+                suggested_radius_km = probe
+                suggested_count = int(n)
+                break
+
+    return EventListOut(
+        items=items, next_cursor=next_cursor,
+        suggested_radius_km=suggested_radius_km, suggested_count=suggested_count,
+    )
 
 
 @router.get("/mine", response_model=EventListOut)
