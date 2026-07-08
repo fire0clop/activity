@@ -64,7 +64,7 @@ struct EventDetailView: View {
                 if e.status == "finished", e.isOrganizer || e.myParticipation?.status == "accepted" {
                     NavigationLink { ReviewView(event: e) } label: {
                         Label("Оставить отзывы", systemImage: "star.bubble").font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentInk)
                     }
                 }
                 Color.clear.frame(height: 120)  // запас под sticky-CTA, чтобы контент не прятался
@@ -132,7 +132,7 @@ struct EventDetailView: View {
             let p = DateFormat.dayPill(e.day)
             VStack(spacing: 0) {
                 Text(p.num).font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.ink)
-                Text(p.month).font(.system(size: 10, weight: .heavy)).foregroundStyle(Theme.accent)
+                Text(p.month).font(.system(size: 10, weight: .heavy)).foregroundStyle(Theme.accentInk)
             }
             .frame(width: 54, height: 54).background(Theme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line))
@@ -159,29 +159,20 @@ struct EventDetailView: View {
             }
             .frame(height: 150).clipShape(RoundedRectangle(cornerRadius: 16)).allowsHitTesting(false)
             if let map = e.mapURL, let u = URL(string: map) {
-                Link(destination: u) { Label("Открыть в Яндекс.Картах", systemImage: "map.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent) }
+                Link(destination: u) { Label("Открыть в Яндекс.Картах", systemImage: "map.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accentInk) }
             }
         }
     }
 
     private func factsRow(_ e: EventDetail) -> some View {
-        HStack(spacing: 10) {
-            factChip("person.2.fill", "\(e.participantsCurrent)/\(e.participantsMax.map(String.init) ?? "∞")", "участники")
-            if let p = e.price, p > 0 { factChip("rublesign", "\(Int(p))", e.priceSplit == "shared" ? "на всех" : "с человека") }
-            else { factChip("gift.fill", "Free", "бесплатно") }
-        }
-    }
-
-    private func factChip(_ icon: String, _ value: String, _ label: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(value).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.ink)
-                Text(label).font(.system(size: 11)).foregroundStyle(Theme.ink2)
-            }
-        }
-        .padding(.horizontal, 14).padding(.vertical, 10).background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14)).overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line))
+        let hasPrice = (e.price ?? 0) > 0
+        let priceValue = hasPrice ? "\(Int(e.price!)) ₽" : "Free"
+        let priceLabel = hasPrice ? (e.priceSplit == "shared" ? "на всех" : "с человека") : "бесплатно"
+        // Единый компонент метрик — тот же, что в статистике профиля.
+        return MetricsRow(items: [
+            .init(value: "\(e.participantsCurrent)/\(e.participantsMax.map(String.init) ?? "∞")", label: "участники"),
+            .init(value: priceValue, label: priceLabel),
+        ])
     }
 
     private func goingBlock(_ e: EventDetail) -> some View {
@@ -192,7 +183,7 @@ struct EventDetailView: View {
                             names: e.acceptedParticipants.map { $0.name }, size: 38)
                 Spacer()
                 NavigationLink { ParticipantsView(eventID: e.id) } label: {
-                    Text("Все").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent)
+                    Text("Все").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accentInk)
                 }
             }
         }

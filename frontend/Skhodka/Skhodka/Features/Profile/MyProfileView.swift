@@ -98,23 +98,12 @@ struct MyProfileView: View {
     }
 
     private func statsCard(_ me: UserPrivate) -> some View {
-        HStack(spacing: 0) {
-            stat("\(me.eventsCreated)", "Создано")
-            divider
-            stat("\(me.eventsAttended)", "Посещено")
-            divider
-            stat("\(me.ratingCount)", "Отзывов")
-        }
-        .padding(.vertical, 16).frame(maxWidth: .infinity).cardStyle()
+        MetricsRow(items: [
+            .init(value: "\(me.eventsCreated)", label: "Создано"),
+            .init(value: "\(me.eventsAttended)", label: "Посещено"),
+            .init(value: "\(me.ratingCount)", label: "Отзывов"),
+        ])
     }
-
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value).font(.serifTitle(22, weight: .bold)).foregroundStyle(Theme.ink)
-            Text(label).font(.system(size: 12)).foregroundStyle(Theme.ink2)
-        }.frame(maxWidth: .infinity)
-    }
-    private var divider: some View { Rectangle().fill(Theme.line).frame(width: 1, height: 32) }
 
     private var actionsCard: some View {
         VStack(spacing: 0) {

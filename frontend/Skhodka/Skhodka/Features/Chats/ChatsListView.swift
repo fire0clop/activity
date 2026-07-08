@@ -28,9 +28,10 @@ struct ChatsListView: View {
                         if items.isEmpty && isLoading {
                             ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 60)
                         } else if let errorText, items.isEmpty {
-                            errorState(errorText)
+                            ErrorState(subtitle: errorText) { Task { await load() } }
                         } else if items.isEmpty {
-                            emptyState
+                            EmptyState(icon: "bubble.left.and.bubble.right.fill", title: "Пока пусто",
+                                       subtitle: "Чат события откроется, когда тебя примут или к тебе придут.")
                         } else {
                             if let errorText {
                                 Text(errorText).font(.footnote).foregroundStyle(.red)
@@ -91,29 +92,6 @@ struct ChatsListView: View {
             }
         }
         .padding(12).cardStyle()
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Theme.accentSoft).frame(width: 96, height: 96)
-                Image(systemName: "bubble.left.and.bubble.right.fill").font(.system(size: 34)).foregroundStyle(Theme.accent)
-            }
-            Text("Пока пусто").font(.serifTitle(22, weight: .bold)).foregroundStyle(Theme.ink)
-            Text("Чат события откроется,\nкогда тебя примут или к тебе придут.")
-                .font(.subheadline).foregroundStyle(Theme.ink2).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity).padding(.top, 60)
-    }
-
-    private func errorState(_ message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "wifi.slash").font(.system(size: 34)).foregroundStyle(Theme.ink2)
-            Text(message).font(.subheadline).foregroundStyle(Theme.ink2).multilineTextAlignment(.center)
-            Button("Повторить") { Task { await load() } }
-                .font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
-        }
-        .frame(maxWidth: .infinity).padding(.top, 60)
     }
 
     private func load() async {

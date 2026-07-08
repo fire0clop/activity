@@ -54,6 +54,7 @@ struct EventCreateView: View {
                 } label: {
                     Label(picked == nil ? "Выбрать точку на карте" : "Точка выбрана на карте ✓",
                           systemImage: "mappin.and.ellipse")
+                        .foregroundStyle(Theme.accentInk)
                 }
                 if let p = picked {
                     Text(String(format: "Координаты: %.5f, %.5f", p.latitude, p.longitude))

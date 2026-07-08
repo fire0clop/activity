@@ -56,7 +56,12 @@ struct FeedView: View {
                 header
                 searchAndChips
                 if vm.items.isEmpty && vm.isLoading {
-                    ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 60)
+                    VStack(spacing: 16) {
+                        ForEach(0..<3, id: \.self) { _ in SkeletonCard() }
+                    }
+                    .padding(.top, 4)
+                } else if let err = vm.errorText, vm.items.isEmpty {
+                    ErrorState(subtitle: err) { Task { await vm.refresh() } }
                 } else if vm.items.isEmpty {
                     emptyState
                 } else {
@@ -83,7 +88,7 @@ struct FeedView: View {
                             .font(.system(size: 12, weight: .heavy)).tracking(1.5)
                         Image(systemName: "chevron.down").font(.system(size: 9, weight: .heavy))
                     }
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.accentInk)
                 }
                 .accessibilityLabel("Город: \(vm.manualCity?.name ?? "моё местоположение")")
                 .accessibilityHint("Выбрать другой город")
