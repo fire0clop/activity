@@ -297,7 +297,10 @@ private struct FeatureEventCard: View {
                         meta("person.2.fill", "\(item.participantsCurrent)/\(item.participantsMax.map(String.init) ?? "∞")")
                         if let p = item.price, p > 0 { meta("rublesign", "\(Int(p))") }
                         Spacer()
-                        RatingView(value: item.organizer.ratingAvg, count: 0)
+                        // Рейтинг организатора показываем только когда он есть — иначе «★ —» путает.
+                        if item.organizer.ratingAvg > 0 {
+                            RatingView(value: item.organizer.ratingAvg, count: 1)
+                        }
                     }
                 }.padding(14)
             }
