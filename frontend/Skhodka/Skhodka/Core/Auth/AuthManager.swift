@@ -46,6 +46,14 @@ final class AuthManager: ObservableObject {
     // MARK: - Lifecycle
 
     func bootstrap() async {
+        #if DEBUG
+        // UI-тесты/скриншоты: можно стартовать уже авторизованным, передав токены через
+        // окружение запуска (никогда не попадает в релиз — под #if DEBUG).
+        let env = ProcessInfo.processInfo.environment
+        if let access = env["UITEST_ACCESS_TOKEN"], let refresh = env["UITEST_REFRESH_TOKEN"] {
+            tokenStore.save(access: access, refresh: refresh)
+        }
+        #endif
         guard tokenStore.hasSession else { state = .signedOut; return }
         await refreshMe()
     }

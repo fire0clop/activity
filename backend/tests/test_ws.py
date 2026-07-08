@@ -78,7 +78,7 @@ def test_ws_history_and_message_delivery() -> None:
         with tc.websocket_connect(_ws_url(cid, org["token"])) as ws1:
             history = _recv_type(ws1, "history")
             # системные сообщения о вступлении и времени уже в истории
-            assert any("присоединился" in m["text"] for m in history["messages"])
+            assert any("в группе" in m["text"] for m in history["messages"])
 
             with tc.websocket_connect(_ws_url(cid, guest["token"])) as ws2:
                 _recv_type(ws2, "history")

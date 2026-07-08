@@ -131,7 +131,7 @@ async def on_accept(db: AsyncSession, event: Event, participant: User) -> None:
         await chat_service.ensure_member(db, conv.id, participant.id)
         await db.commit()
         await chat_service.post_message(
-            db, conv.id, f"{participant.name} присоединился", sender_id=None, is_system=True
+            db, conv.id, f"{participant.name} теперь в группе", sender_id=None, is_system=True
         )
         await chat_service.post_message(
             db, conv.id, format_time(event), sender_id=None, is_system=True

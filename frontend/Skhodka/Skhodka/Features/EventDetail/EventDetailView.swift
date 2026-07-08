@@ -67,7 +67,7 @@ struct EventDetailView: View {
                             .foregroundStyle(Theme.accent)
                     }
                 }
-                Color.clear.frame(height: 90)
+                Color.clear.frame(height: 120)  // запас под sticky-CTA, чтобы контент не прятался
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -243,7 +243,10 @@ struct EventDetailView: View {
             }
             .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 28)
         }
-        .background(Theme.paper.opacity(0.98))
+        // Непрозрачный фон + мягкая тень сверху: контент уходит ПОД панель чисто,
+        // а не просвечивает сквозь неё (раньше метрики «обрезались» полупрозрачным баром).
+        .background(Theme.paper)
+        .shadow(color: Theme.ink.opacity(0.08), radius: 8, y: -3)
     }
 
     private func ctaLabel(_ title: String, filled: Bool) -> some View {

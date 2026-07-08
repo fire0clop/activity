@@ -12,18 +12,24 @@ struct ChatView: View {
     @State private var draft = ""
     @State private var historyError: String?
 
+    private var canSend: Bool {
+        ws.connected && !draft.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
+                    LazyVStack(alignment: .leading, spacing: 3) {
                         if let historyError, ws.messages.isEmpty {
-                            Text(historyError).font(.caption).foregroundStyle(.secondary)
+                            Text(historyError).font(.footnote).foregroundStyle(Theme.ink2)
                                 .frame(maxWidth: .infinity, alignment: .center).padding(.top, 24)
                         }
-                        ForEach(ws.messages) { m in bubble(m).id(m.id) }
+                        ForEach(Array(ws.messages.enumerated()), id: \.element.id) { index, m in
+                            row(m, prev: index > 0 ? ws.messages[index - 1] : nil).id(m.id)
+                        }
                     }
-                    .padding()
+                    .padding(.horizontal, 14).padding(.vertical, 12)
                 }
                 .onChange(of: ws.messages.count) { _, _ in
                     if let last = ws.messages.last {
@@ -31,32 +37,16 @@ struct ChatView: View {
                     }
                 }
             }
-            Divider()
-            if isArchived {
-                Label("Событие завершено — беседа в архиве", systemImage: "archivebox")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity).padding(12)
-            } else {
-                HStack {
-                    TextField("Сообщение…", text: $draft, axis: .vertical)
-                        .textFieldStyle(.roundedBorder).lineLimit(1...4)
-                    Button {
-                        // Очищаем поле только если сообщение реально ушло в сокет —
-                        // иначе при обрыве текст молча пропадал бы.
-                        if ws.send(text: draft) { draft = ""; Haptics.tap() }
-                    } label: { Image(systemName: "paperplane.fill") }
-                        .disabled(!ws.connected || draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .accessibilityLabel("Отправить сообщение")
-                }
-                .padding(8)
-            }
+            inputBar
         }
+        .background(Theme.paper.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 10) {
-                    Circle().fill(ws.connected ? .green : .gray).frame(width: 9, height: 9)
+                    Circle().fill(ws.connected ? Theme.accent : Theme.line)
+                        .frame(width: 9, height: 9)
                         .accessibilityLabel(ws.connected ? "В сети" : "Нет соединения")
                     if isGroup {
                         NavigationLink { GroupInfoView(conversationID: conversationID) } label: {
@@ -79,6 +69,39 @@ struct ChatView: View {
         .onDisappear { ws.disconnect() }
     }
 
+    @ViewBuilder
+    private var inputBar: some View {
+        if isArchived {
+            Label("Событие завершено — беседа в архиве", systemImage: "archivebox")
+                .font(.footnote).foregroundStyle(Theme.ink2)
+                .frame(maxWidth: .infinity).padding(14)
+                .background(Theme.paper)
+        } else {
+            HStack(spacing: 8) {
+                TextField("Написать сообщение…", text: $draft, axis: .vertical)
+                    .lineLimit(1...4)
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .background(Theme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.line))
+                Button {
+                    if ws.send(text: draft) { draft = ""; Haptics.tap() }
+                } label: {
+                    Image(systemName: "paperplane.fill").font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(canSend ? Theme.accent : Theme.line)
+                        .clipShape(Circle())
+                }
+                .disabled(!canSend)
+                .accessibilityLabel("Отправить сообщение")
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Theme.paper)
+            .overlay(Divider(), alignment: .top)
+        }
+    }
+
     /// Пауза перед REST-фолбэком истории, если WebSocket не успел прислать history.
     private static let historyFallbackDelayNs: UInt64 = 1_500_000_000
 
@@ -97,26 +120,60 @@ struct ChatView: View {
     }
 
     @ViewBuilder
-    private func bubble(_ m: Message) -> some View {
+    private func row(_ m: Message, prev: Message?) -> some View {
         if m.isSystem {
-            Text(m.text).font(.caption).foregroundStyle(.secondary)
+            Text(m.text).font(.caption)
+                .foregroundStyle(Theme.ink2)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Theme.surface).clipShape(Capsule())
                 .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 6)
         } else {
             let mine = m.sender?.id == auth.me?.id
-            HStack {
-                if mine { Spacer(minLength: 40) }
-                VStack(alignment: .leading, spacing: 2) {
-                    if !mine, let name = m.sender?.name {
-                        Text(name).font(.caption2).foregroundStyle(.secondary)
-                    }
-                    Text(m.text)
-                }
-                .padding(10)
-                .background(mine ? Theme.accent.opacity(0.85) : Theme.secondaryBg)
-                .foregroundStyle(mine ? .white : .primary)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                if !mine { Spacer(minLength: 40) }
+            // Новая «группа», когда сменился автор или до этого было системное сообщение.
+            let startsGroup = prev == nil || prev!.isSystem || prev!.sender?.id != m.sender?.id
+            if mine {
+                outgoing(m).padding(.top, startsGroup ? 6 : 0)
+            } else {
+                incoming(m, showHeader: startsGroup).padding(.top, startsGroup ? 6 : 0)
             }
+        }
+    }
+
+    private func outgoing(_ m: Message) -> some View {
+        HStack {
+            Spacer(minLength: 48)
+            Text(m.text)
+                .foregroundStyle(Theme.accentInk)
+                .padding(.horizontal, 13).padding(.vertical, 9)
+                .background(Theme.accent.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.accent.opacity(0.22)))
+        }
+    }
+
+    private func incoming(_ m: Message, showHeader: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            // Колонка аватара фиксированной ширины — сгруппированные сообщения выравниваются.
+            Group {
+                if showHeader {
+                    AvatarCircle(url: m.sender?.avatarURL, name: m.sender?.name, size: 30)
+                } else {
+                    Color.clear.frame(width: 30, height: 1)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                if showHeader, let name = m.sender?.name {
+                    Text(name).font(.caption2).foregroundStyle(Theme.ink2).padding(.leading, 2)
+                }
+                Text(m.text)
+                    .foregroundStyle(Theme.ink)
+                    .padding(.horizontal, 13).padding(.vertical, 9)
+                    .background(Theme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.line))
+            }
+            Spacer(minLength: 40)
         }
     }
 }

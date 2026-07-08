@@ -8,9 +8,10 @@ enum Theme {
     static let paper = Color(red: 0.98, green: 0.966, blue: 0.93)      // тёплый офф-вайт фон
     static let surface = Color.white                                    // карточки
     static let ink = Color(red: 0.11, green: 0.10, blue: 0.08)          // тёмный текст
-    static let ink2 = Color(red: 0.44, green: 0.42, blue: 0.37)         // вторичный текст
+    static let ink2 = Color(red: 0.34, green: 0.32, blue: 0.28)         // вторичный текст (≥4.5:1 на бумаге)
     static let line = Color(red: 0.90, green: 0.88, blue: 0.82)         // хайрлайны
-    static let accent = Color(red: 1.0, green: 0.31, blue: 0.18)        // коралл-акцент
+    static let accent = Color(red: 1.0, green: 0.31, blue: 0.18)        // коралл-акцент (крупные кнопки/иконки)
+    static let accentInk = Color(red: 0.85, green: 0.24, blue: 0.10)    // затемнённый коралл для ТЕКСТА/ссылок/пузырей (≥4.5:1)
     static let accentSoft = Color(red: 1.0, green: 0.31, blue: 0.18).opacity(0.12)
     static let star = Color(red: 0.98, green: 0.70, blue: 0.10)         // цвет рейтинга-звезды
     static let danger = Color(red: 0.85, green: 0.20, blue: 0.16)       // ошибки/деструктив

@@ -108,8 +108,14 @@ struct EventCreateView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Theme.paper.ignoresSafeArea())
-        .navigationTitle("Новое событие")
+        .tint(Theme.accent)                      // тумблеры/степпер/пикеры в бренде, не системный серый
+        .toolbar(.hidden, for: .tabBar)          // форма на весь экран — контент не прячется под таб-бар
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Новое событие").font(.serifTitle(18, weight: .bold)).foregroundStyle(Theme.ink)
+            }
+        }
         .onChange(of: photoItems) { _, items in
             Task { await loadPhotos(items) }
         }
@@ -129,12 +135,14 @@ struct EventCreateView: View {
             Haptics.tap()
         } label: {
             HStack(spacing: 5) {
+                // Цвет несёт иконка; текст — тёмный (контраст стабилен на любой пастели).
                 Image(systemName: c.icon).font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(selected ? .white : c.color)
                 Text(c.title).font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(selected ? .white : Theme.ink)
             }
-            .foregroundStyle(selected ? .white : c.color)
             .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(selected ? c.color : c.color.opacity(0.12))
+            .background(selected ? c.color : c.color.opacity(0.14))
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)

@@ -67,14 +67,17 @@ struct MainTabView: View {
         UITabBar.appearance().scrollEdgeAppearance = a
     }
 
+    @State private var tab = 0
+    @State private var showCreate = false
+
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             FeedView()
-                .tabItem { Label("Лента", systemImage: "square.grid.2x2.fill") }
+                .tabItem { Label("Лента", systemImage: "square.grid.2x2.fill") }.tag(0)
             ChatsListView()
-                .tabItem { Label("Чаты", systemImage: "bubble.left.and.bubble.right.fill") }
+                .tabItem { Label("Чаты", systemImage: "bubble.left.and.bubble.right.fill") }.tag(1)
             MyProfileView()
-                .tabItem { Label("Профиль", systemImage: "person.fill") }
+                .tabItem { Label("Профиль", systemImage: "person.fill") }.tag(2)
         }
         .tint(Theme.accent)
         // Deep-link из нажатого пуша: событие или чат поверх текущего таба.
@@ -88,5 +91,20 @@ struct MainTabView: View {
                 }
             }
         }
+        .sheet(isPresented: $showCreate) { NavigationStack { EventCreateView() } }
+        .onAppear(perform: applyUITestRoute)
+    }
+
+    /// DEBUG-only: переход на нужный экран по переменной окружения запуска — для headless
+    /// снятия скриншотов (никакого управления мышью). В релиз не попадает.
+    private func applyUITestRoute() {
+        #if DEBUG
+        guard let route = ProcessInfo.processInfo.environment["UITEST_ROUTE"] else { return }
+        if route == "profile" { tab = 2 }
+        else if route == "chats" { tab = 1 }
+        else if route == "create" { showCreate = true }
+        else if route.hasPrefix("event:") { push.pendingRoute = .event(id: String(route.dropFirst(6))) }
+        else if route.hasPrefix("chat:") { push.pendingRoute = .conversation(id: String(route.dropFirst(5))) }
+        #endif
     }
 }
