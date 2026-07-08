@@ -78,6 +78,28 @@ struct SkeletonCard: View {
     }
 }
 
+/// Секция формы в бумажной карточке: серифный строчный заголовок + поля (разделяй FormDivider).
+struct FormSection<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.serifTitle(19, weight: .semibold)).foregroundStyle(Theme.ink)
+                .padding(.leading, 4)
+            VStack(alignment: .leading, spacing: 12) { content() }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle()
+        }
+    }
+}
+
+/// Хайрлайн-разделитель между полями внутри FormSection.
+struct FormDivider: View {
+    var body: some View { Divider().background(Theme.line) }
+}
+
 /// Ряд метрик с вертикальными разделителями — единый компонент для детали события и профиля.
 struct MetricsRow: View {
     struct Metric { let value: String; let label: String }

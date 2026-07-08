@@ -17,6 +17,7 @@ enum DateFormat {
     }
     private static let fPrettyDay = ru("EE, d MMMM")
     private static let fDateTime = ru("d MMMM, HH:mm")
+    private static let fMemberSince = ru("d MMMM yyyy")
     private static let fTime = ru("HH:mm")
     private static let fDayNum = ru("d")
     private static let fMonthShort = ru("MMM")
@@ -45,6 +46,12 @@ enum DateFormat {
     static func prettyDateTime(_ s: String?) -> String {
         guard let d = parse(s) else { return "—" }
         return fDateTime.string(from: d)
+    }
+
+    /// Дата без времени: "8 июля 2026" — для «в приложении с …» (не машинный лог с минутами).
+    static func memberSince(_ s: String?) -> String {
+        guard let d = parse(s) else { return "—" }
+        return fMemberSince.string(from: d)
     }
 
     static func time(_ s: String?) -> String {

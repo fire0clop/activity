@@ -116,8 +116,10 @@ async def clone_recurring_event(db: AsyncSession, event: Event) -> Event | None:
 
 
 def format_time(event: Event) -> str:
-    t = event.starts_at.strftime("%d.%m %H:%M UTC")
-    return f"Точное время: {t}. Место: {event.address or '—'}"
+    # Читается как сообщение, а не как лог. Время в UTC (клиент показывает как есть).
+    t = event.starts_at.strftime("%d.%m в %H:%M")
+    place = event.address or "уточняется"
+    return f"📍 Встречаемся {t} (UTC). Место: {place}"
 
 
 async def on_accept(db: AsyncSession, event: Event, participant: User) -> None:

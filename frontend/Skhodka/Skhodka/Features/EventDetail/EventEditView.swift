@@ -38,50 +38,63 @@ struct EventEditView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Что и когда") {
-                    TextField("Название", text: $title)
-                    TextField("Категория", text: $category)
-                    DatePicker("Начало", selection: $startsAt, in: Date()...)
-                }
-                Section("Где") {
-                    TextField("Новая ссылка Яндекс.Карт (если менять)", text: $newMapURL)
-                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                }
-                Section("Компания") {
-                    Toggle("Без ограничения", isOn: $unlimited)
-                    if !unlimited {
-                        Stepper("Максимум: \(maxParticipants)", value: $maxParticipants, in: 2...100)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    FormSection(title: "Что и когда") {
+                        TextField("Название", text: $title)
+                        FormDivider()
+                        TextField("Категория", text: $category)
+                        FormDivider()
+                        DatePicker("Начало", selection: $startsAt, in: Date()...)
                     }
-                    Toggle("Авто-приём первых", isOn: $autoAccept)
-                    TextField("Стоимость, ₽", text: $price).keyboardType(.numberPad)
-                }
-                Section("Фото") {
-                    if !photos.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                ForEach(photos, id: \.self) { p in
-                                    photoThumb(p)
+                    FormSection(title: "Где") {
+                        TextField("Новая ссылка Яндекс.Карт (если менять)", text: $newMapURL)
+                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    }
+                    FormSection(title: "Компания") {
+                        Toggle("Без ограничения", isOn: $unlimited)
+                        if !unlimited {
+                            FormDivider()
+                            Stepper("Максимум: \(maxParticipants)", value: $maxParticipants, in: 2...100)
+                        }
+                        FormDivider()
+                        Toggle("Авто-приём первых", isOn: $autoAccept)
+                        FormDivider()
+                        TextField("Стоимость, ₽", text: $price).keyboardType(.numberPad)
+                    }
+                    FormSection(title: "Фото") {
+                        if !photos.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack {
+                                    ForEach(photos, id: \.self) { p in photoThumb(p) }
                                 }
                             }
                         }
-                    }
-                    if photos.count < 5 {
-                        PhotosPicker(selection: $newPhoto, matching: .images) {
-                            Label("Добавить фото", systemImage: "plus")
+                        if photos.count < 5 {
+                            PhotosPicker(selection: $newPhoto, matching: .images) {
+                                Label("Добавить фото", systemImage: "photo.on.rectangle.angled")
+                                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accentInk)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
-                }
-                Section("Описание") {
-                    TextField("Описание", text: $description, axis: .vertical).lineLimit(3...8)
-                }
-                if let errorText { Text(errorText).foregroundStyle(.red) }
-                Section {
+                    FormSection(title: "Описание") {
+                        TextField("Описание", text: $description, axis: .vertical).lineLimit(3...8)
+                    }
+                    if let errorText {
+                        Text(errorText).font(.footnote).foregroundStyle(Theme.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
+                    }
                     Button(role: .destructive) { confirmDelete = true } label: {
-                        Label("Удалить событие", systemImage: "trash").frame(maxWidth: .infinity)
+                        Label("Удалить событие", systemImage: "trash")
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.danger)
+                            .frame(maxWidth: .infinity, minHeight: 50).cardStyle()
                     }
                 }
+                .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 40)
             }
+            .background(Theme.paper.ignoresSafeArea())
+            .tint(Theme.accent)
             .navigationTitle("Редактирование")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

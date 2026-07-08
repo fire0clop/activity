@@ -34,12 +34,12 @@ struct EventCreateView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                sectionCard("Что и когда") {
+                FormSection(title: "Что и когда") {
                     TextField("Название (напр. «Гидроциклы»)", text: $title)
-                    fieldDivider
+                    FormDivider()
                     DatePicker("Начало", selection: $startsAt, in: Date()...)
                 }
-                sectionCard("Категория") {
+                FormSection(title: "Категория") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: Spacing.sm) {
                             ForEach(Categories.pickable, id: \.self) { categoryChip($0) }
@@ -47,7 +47,7 @@ struct EventCreateView: View {
                         .padding(.vertical, 2)
                     }
                 }
-                sectionCard("Где") {
+                FormSection(title: "Где") {
                     Button { showPicker = true } label: {
                         Label(picked == nil ? "Выбрать точку на карте" : "Точка выбрана на карте ✓",
                               systemImage: "mappin.and.ellipse")
@@ -58,30 +58,30 @@ struct EventCreateView: View {
                         Text(String(format: "Координаты: %.5f, %.5f", p.latitude, p.longitude))
                             .font(.caption).foregroundStyle(Theme.ink2)
                     }
-                    fieldDivider
+                    FormDivider()
                     Text("или вставьте ссылку из Яндекс.Карт:").font(.caption).foregroundStyle(Theme.ink2)
                     TextField("Ссылка на точку", text: $mapURL)
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .onChange(of: mapURL) { _, new in
                             if !new.trimmingCharacters(in: .whitespaces).isEmpty { picked = nil }
                         }
-                    fieldDivider
+                    FormDivider()
                     TextField("Подсказка к месту (напр. «у пирса №3»)", text: $address)
                 }
-                sectionCard("Компания") {
+                FormSection(title: "Компания") {
                     Toggle("Без ограничения по людям", isOn: $unlimited)
                     if !unlimited {
-                        fieldDivider
+                        FormDivider()
                         Stepper("Максимум: \(maxParticipants)", value: $maxParticipants, in: 2...100)
                     }
-                    fieldDivider
+                    FormDivider()
                     Toggle("Авто-приём первых", isOn: $autoAccept)
-                    fieldDivider
+                    FormDivider()
                     Toggle("Повторять еженедельно", isOn: $repeatWeekly)
-                    fieldDivider
+                    FormDivider()
                     TextField("Стоимость, ₽ (опционально)", text: $price).keyboardType(.numberPad)
                 }
-                sectionCard("Фото (до 5)") {
+                FormSection(title: "Фото (до 5)") {
                     PhotosPicker(selection: $photoItems, maxSelectionCount: 5, matching: .images) {
                         Label("Добавить фото", systemImage: "photo.on.rectangle.angled")
                             .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accentInk)
@@ -99,7 +99,7 @@ struct EventCreateView: View {
                         }
                     }
                 }
-                sectionCard("Описание") {
+                FormSection(title: "Описание") {
                     TextField("Формат, что взять, бюджет", text: $description, axis: .vertical)
                         .lineLimit(3...8)
                 }
@@ -133,20 +133,6 @@ struct EventCreateView: View {
             }
         }
     }
-
-    /// Секция-карточка: серифный строчный заголовок + бумажная карточка с полями.
-    private func sectionCard<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.serifTitle(19, weight: .semibold)).foregroundStyle(Theme.ink)
-                .padding(.leading, 4)
-            VStack(alignment: .leading, spacing: 12) { content() }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .cardStyle()
-        }
-    }
-
-    private var fieldDivider: some View { Divider().background(Theme.line) }
 
     private func categoryChip(_ key: String) -> some View {
         let c = Categories.of(key)

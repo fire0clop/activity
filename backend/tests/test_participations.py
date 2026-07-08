@@ -49,7 +49,7 @@ async def test_join_accept_creates_chat_and_discloses_time(client, user_factory)
     # в чате есть системные сообщения (присоединение + время)
     cid = detail["conversation_id"]
     msgs = (await client.get(f"/conversations/{cid}/messages", headers=guest["headers"])).json()["items"]
-    assert any(m["is_system"] and "Точное время" in m["text"] for m in msgs)
+    assert any(m["is_system"] and "Встречаемся" in m["text"] for m in msgs)
 
 
 @pytest.mark.asyncio

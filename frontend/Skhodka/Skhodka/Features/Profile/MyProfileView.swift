@@ -68,7 +68,7 @@ struct MyProfileView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(me.name ?? "Без имени").font(.serifTitle(24, weight: .bold)).foregroundStyle(Theme.ink)
                     RatingView(value: me.ratingAvg, count: me.ratingCount)
-                    Text("в приложении с \(DateFormat.prettyDateTime(me.memberSince))")
+                    Text("в приложении с \(DateFormat.memberSince(me.memberSince))")
                         .font(.system(size: 12)).foregroundStyle(Theme.ink2)
                 }
                 Spacer()
