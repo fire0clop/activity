@@ -32,82 +32,88 @@ struct EventCreateView: View {
     }
 
     var body: some View {
-        Form {
-            Section("Что и когда") {
-                TextField("Название (напр. «Гидроциклы»)", text: $title)
-                DatePicker("Начало", selection: $startsAt, in: Date()...)
-            }
-            Section("Категория") {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.sm) {
-                        ForEach(Categories.pickable, id: \.self) { key in
-                            categoryChip(key)
-                        }
-                    }
-                    .padding(.vertical, 2)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                sectionCard("Что и когда") {
+                    TextField("Название (напр. «Гидроциклы»)", text: $title)
+                    fieldDivider
+                    DatePicker("Начало", selection: $startsAt, in: Date()...)
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            }
-            Section("Где") {
-                Button {
-                    showPicker = true
-                } label: {
-                    Label(picked == nil ? "Выбрать точку на карте" : "Точка выбрана на карте ✓",
-                          systemImage: "mappin.and.ellipse")
-                        .foregroundStyle(Theme.accentInk)
-                }
-                if let p = picked {
-                    Text(String(format: "Координаты: %.5f, %.5f", p.latitude, p.longitude))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                Text("или вставьте ссылку из Яндекс.Карт:").font(.caption).foregroundStyle(.secondary)
-                TextField("Ссылка на точку из Яндекс.Карт", text: $mapURL)
-                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .onChange(of: mapURL) { _, new in
-                        if !new.trimmingCharacters(in: .whitespaces).isEmpty { picked = nil }
-                    }
-
-                TextField("Подсказка к месту (напр. «у пирса №3»)", text: $address)
-            }
-            Section("Компания") {
-                Toggle("Без ограничения по людям", isOn: $unlimited)
-                if !unlimited {
-                    Stepper("Максимум: \(maxParticipants)", value: $maxParticipants, in: 2...100)
-                }
-                Toggle("Авто-приём первых", isOn: $autoAccept)
-                Toggle("Повторять еженедельно", isOn: $repeatWeekly)
-                TextField("Стоимость, ₽ (опционально)", text: $price).keyboardType(.numberPad)
-            }
-            Section("Фото (до 5)") {
-                PhotosPicker(selection: $photoItems, maxSelectionCount: 5, matching: .images) {
-                    Label("Добавить фото", systemImage: "photo.on.rectangle.angled")
-                }
-                if !photoImages.isEmpty {
+                sectionCard("Категория") {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack {
-                            ForEach(Array(photoImages.enumerated()), id: \.offset) { _, img in
-                                Image(uiImage: img).resizable().scaledToFill()
-                                    .frame(width: 70, height: 70)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                        HStack(spacing: Spacing.sm) {
+                            ForEach(Categories.pickable, id: \.self) { categoryChip($0) }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                sectionCard("Где") {
+                    Button { showPicker = true } label: {
+                        Label(picked == nil ? "Выбрать точку на карте" : "Точка выбрана на карте ✓",
+                              systemImage: "mappin.and.ellipse")
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accentInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if let p = picked {
+                        Text(String(format: "Координаты: %.5f, %.5f", p.latitude, p.longitude))
+                            .font(.caption).foregroundStyle(Theme.ink2)
+                    }
+                    fieldDivider
+                    Text("или вставьте ссылку из Яндекс.Карт:").font(.caption).foregroundStyle(Theme.ink2)
+                    TextField("Ссылка на точку", text: $mapURL)
+                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .onChange(of: mapURL) { _, new in
+                            if !new.trimmingCharacters(in: .whitespaces).isEmpty { picked = nil }
+                        }
+                    fieldDivider
+                    TextField("Подсказка к месту (напр. «у пирса №3»)", text: $address)
+                }
+                sectionCard("Компания") {
+                    Toggle("Без ограничения по людям", isOn: $unlimited)
+                    if !unlimited {
+                        fieldDivider
+                        Stepper("Максимум: \(maxParticipants)", value: $maxParticipants, in: 2...100)
+                    }
+                    fieldDivider
+                    Toggle("Авто-приём первых", isOn: $autoAccept)
+                    fieldDivider
+                    Toggle("Повторять еженедельно", isOn: $repeatWeekly)
+                    fieldDivider
+                    TextField("Стоимость, ₽ (опционально)", text: $price).keyboardType(.numberPad)
+                }
+                sectionCard("Фото (до 5)") {
+                    PhotosPicker(selection: $photoItems, maxSelectionCount: 5, matching: .images) {
+                        Label("Добавить фото", systemImage: "photo.on.rectangle.angled")
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accentInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if !photoImages.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack {
+                                ForEach(Array(photoImages.enumerated()), id: \.offset) { _, img in
+                                    Image(uiImage: img).resizable().scaledToFill()
+                                        .frame(width: 70, height: 70)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
                             }
                         }
                     }
                 }
-            }
-            Section("Описание") {
-                TextField("Формат, что взять, бюджет", text: $description, axis: .vertical)
-                    .lineLimit(3...8)
-            }
-            if let errorText { Text(errorText).foregroundStyle(.red) }
-            Section {
+                sectionCard("Описание") {
+                    TextField("Формат, что взять, бюджет", text: $description, axis: .vertical)
+                        .lineLimit(3...8)
+                }
+                if let errorText {
+                    Text(errorText).font(.footnote).foregroundStyle(Theme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
+                }
                 PrimaryButton(title: "Опубликовать", isLoading: isLoading, isEnabled: canSubmit) {
                     Task { await submit() }
                 }
-                .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                .padding(.top, 4)
             }
+            .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 40)
         }
-        .scrollContentBackground(.hidden)
         .background(Theme.paper.ignoresSafeArea())
         .tint(Theme.accent)                      // тумблеры/степпер/пикеры в бренде, не системный серый
         .toolbar(.hidden, for: .tabBar)          // форма на весь экран — контент не прячется под таб-бар
@@ -127,6 +133,20 @@ struct EventCreateView: View {
             }
         }
     }
+
+    /// Секция-карточка: серифный строчный заголовок + бумажная карточка с полями.
+    private func sectionCard<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.serifTitle(19, weight: .semibold)).foregroundStyle(Theme.ink)
+                .padding(.leading, 4)
+            VStack(alignment: .leading, spacing: 12) { content() }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle()
+        }
+    }
+
+    private var fieldDivider: some View { Divider().background(Theme.line) }
 
     private func categoryChip(_ key: String) -> some View {
         let c = Categories.of(key)
