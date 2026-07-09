@@ -23,11 +23,23 @@ class TokenPair(BaseModel):
     expires_in: int
 
 
-# --- Регистрация по телефону (SMS) + пароль -------------------------------
+# --- Подтверждение телефона (шаг 2 регистрации) ---------------------------
 
-class RegisterIn(BaseModel):
+class VerifyCodeIn(BaseModel):
     phone: PhoneStr
     code: str
+
+
+class VerifyCodeOut(BaseModel):
+    verification_token: str
+    is_new_user: bool
+    expires_in: int
+
+
+# --- Регистрация: тикет подтверждённого телефона + пароль (шаг 3) ----------
+
+class RegisterIn(BaseModel):
+    verification_token: str
     password: str = Field(..., min_length=6, max_length=128)
 
 

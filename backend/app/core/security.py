@@ -26,6 +26,23 @@ def create_access_token(user_id: uuid.UUID) -> tuple[str, int]:
     return token, expires_in
 
 
+PHONE_VERIFY_TTL_MIN = 10
+
+
+def create_verification_token(phone: str) -> tuple[str, int]:
+    """Короткоживущий тикет «телефон подтверждён» — выдаётся после проверки SMS-кода,
+    предъявляется на шаге установки пароля. Возвращает (token, expires_in_seconds)."""
+    expires_in = PHONE_VERIFY_TTL_MIN * 60
+    payload = {
+        "sub": phone,
+        "type": "phone_verify",
+        "iat": int(_now().timestamp()),
+        "exp": int((_now() + timedelta(seconds=expires_in)).timestamp()),
+    }
+    token = jwt.encode(payload, settings.app_secret_key, algorithm=settings.jwt_alg)
+    return token, expires_in
+
+
 def create_refresh_token(user_id: uuid.UUID) -> tuple[str, str, datetime]:
     """Возвращает (token, jti, expires_at)."""
     jti = str(uuid.uuid4())

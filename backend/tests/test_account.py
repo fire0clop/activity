@@ -45,7 +45,8 @@ async def test_registration_records_tos_version(client) -> None:
     redis = aioredis.from_url(settings.redis_url)
     code = (await redis.get(f"otp:{phone}")).decode()
     await redis.aclose()
-    r = await client.post("/auth/register", json={"phone": phone, "code": code, "password": "secret123"})
+    vt = (await client.post("/auth/verify-code", json={"phone": phone, "code": code})).json()["verification_token"]
+    r = await client.post("/auth/register", json={"verification_token": vt, "password": "secret123"})
     assert r.status_code == 200
     # Согласие зафиксировано (проверяем через админ-выборку не нужно — достаточно, что регистрация прошла
     # и версия правил проставляется из настроек).

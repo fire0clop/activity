@@ -59,8 +59,11 @@ async def _login(client: httpx.AsyncClient, phone: str, password: str = "secret1
     redis = aioredis.from_url(settings.redis_url)
     code = (await redis.get(f"otp:{phone}")).decode()
     await redis.aclose()
+    # Шаг 2: подтверждаем код → тикет. Шаг 3: тикет + пароль → аккаунт.
+    verify = await client.post("/auth/verify-code", json={"phone": phone, "code": code})
+    token = verify.json()["verification_token"]
     resp = await client.post(
-        "/auth/register", json={"phone": phone, "code": code, "password": password})
+        "/auth/register", json={"verification_token": token, "password": password})
     return resp.json()["access_token"]
 
 

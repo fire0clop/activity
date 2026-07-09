@@ -10,6 +10,7 @@ from app.core.exceptions import AppError, conflict, not_found, unauthorized
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    create_verification_token,
     decode_token,
     hash_password,
     hash_token,
@@ -26,6 +27,8 @@ from app.schemas.auth import (
     RequestCodeOut,
     ResetPasswordIn,
     TokenPair,
+    VerifyCodeIn,
+    VerifyCodeOut,
 )
 from app.services import otp_service
 
@@ -115,17 +118,29 @@ async def request_code(body: RequestCodeIn, redis: RedisDep, request: Request) -
     return RequestCodeOut(sent=True, resend_after_sec=resend_after)
 
 
-@router.post("/register", response_model=RegisterOut)
-async def register(body: RegisterIn, db: DbSession, redis: RedisDep) -> RegisterOut:
-    """Регистрация: подтверждаем телефон кодом из SMS и задаём пароль."""
+@router.post("/verify-code", response_model=VerifyCodeOut)
+async def verify_code(body: VerifyCodeIn, db: DbSession, redis: RedisDep) -> VerifyCodeOut:
+    """Шаг 2 регистрации: проверяем одноразовый SMS-код и выдаём тикет подтверждённого
+    телефона. Пароль спрашивается отдельным шагом (register)."""
     await otp_service.verify_code(redis, body.phone, body.code)
-
     user = (await db.execute(select(User).where(User.phone == body.phone))).scalar_one_or_none()
+    is_new_user = user is None or not user.password_hash
+    token, expires_in = create_verification_token(body.phone)
+    return VerifyCodeOut(verification_token=token, is_new_user=is_new_user, expires_in=expires_in)
+
+
+@router.post("/register", response_model=RegisterOut)
+async def register(body: RegisterIn, db: DbSession) -> RegisterOut:
+    """Шаг 3 регистрации: тикет подтверждённого телефона + выбранный пароль → аккаунт."""
+    payload = decode_token(body.verification_token, expected_type="phone_verify")
+    phone = payload["sub"]
+
+    user = (await db.execute(select(User).where(User.phone == phone))).scalar_one_or_none()
     is_new_user = user is None
     if user is not None and user.password_hash:
         raise conflict("already_registered", "Этот номер уже зарегистрирован — войдите по паролю")
     if user is None:
-        user = User(phone=body.phone, is_phone_verified=True)
+        user = User(phone=phone, is_phone_verified=True)
         db.add(user)
     user.password_hash = hash_password(body.password)
     user.is_phone_verified = True

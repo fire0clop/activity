@@ -29,9 +29,10 @@ def _make_user(tc: TestClient, name: str) -> dict:
     r = sync_redis.Redis.from_url(settings.redis_url)
     code = r.get(f"otp:{phone}").decode()
     r.close()
+    vt = tc.post(f"{API}/auth/verify-code", json={"phone": phone, "code": code}).json()["verification_token"]
     token = tc.post(
         f"{API}/auth/register",
-        json={"phone": phone, "code": code, "password": "secret123"},
+        json={"verification_token": vt, "password": "secret123"},
     ).json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}
     tc.patch(f"{API}/users/me", headers=h, json={"name": name, "bio": "тест"})

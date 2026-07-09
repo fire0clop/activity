@@ -14,6 +14,14 @@ async def _get_code(client, phone: str) -> str:
     return code
 
 
+async def _register(client, phone: str, password: str = "secret123"):
+    """Двухшаговая регистрация: подтверждаем код → тикет, затем тикет + пароль → аккаунт."""
+    code = await _get_code(client, phone)
+    vt = (await client.post("/auth/verify-code", json={"phone": phone, "code": code})).json()
+    return await client.post(
+        "/auth/register", json={"verification_token": vt["verification_token"], "password": password})
+
+
 @pytest.mark.asyncio
 async def test_request_code_cooldown(client) -> None:
     phone = "+79990001100"
@@ -25,16 +33,14 @@ async def test_request_code_cooldown(client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_register_bad_and_expired_code(client) -> None:
+async def test_verify_code_bad_and_expired(client) -> None:
     phone = "+79990001101"
     await client.post("/auth/request-code", json={"phone": phone})
-    bad = await client.post("/auth/register",
-                            json={"phone": phone, "code": "000000", "password": "secret123"})
+    bad = await client.post("/auth/verify-code", json={"phone": phone, "code": "000000"})
     assert bad.status_code == 400
     assert bad.json()["error"]["code"] == "invalid_code"
 
-    no_code = await client.post("/auth/register",
-                                json={"phone": "+79990009999", "code": "123456", "password": "secret123"})
+    no_code = await client.post("/auth/verify-code", json={"phone": "+79990009999", "code": "123456"})
     assert no_code.status_code == 410
     assert no_code.json()["error"]["code"] == "code_expired"
 
@@ -42,14 +48,12 @@ async def test_register_bad_and_expired_code(client) -> None:
 @pytest.mark.asyncio
 async def test_register_then_login_with_password(client) -> None:
     phone = "+79990001102"
-    reg = await client.post("/auth/register",
-                            json={"phone": phone, "code": await _get_code(client, phone), "password": "secret123"})
+    reg = await _register(client, phone)
     assert reg.status_code == 200
     assert reg.json()["is_new_user"] is True
 
     # повторная регистрация того же номера — нельзя
-    dup = await client.post("/auth/register",
-                            json={"phone": phone, "code": await _get_code(client, phone), "password": "secret123"})
+    dup = await _register(client, phone)
     assert dup.status_code == 409
     assert dup.json()["error"]["code"] == "already_registered"
 
@@ -67,8 +71,7 @@ async def test_register_then_login_with_password(client) -> None:
 @pytest.mark.asyncio
 async def test_reset_password(client) -> None:
     phone = "+79990001103"
-    await client.post("/auth/register",
-                      json={"phone": phone, "code": await _get_code(client, phone), "password": "oldpass1"})
+    await _register(client, phone, "oldpass1")
     # смена пароля по коду
     reset = await client.post("/auth/reset-password",
                               json={"phone": phone, "code": await _get_code(client, phone), "new_password": "newpass2"})
@@ -81,8 +84,7 @@ async def test_reset_password(client) -> None:
 @pytest.mark.asyncio
 async def test_refresh_rotation(client) -> None:
     phone = "+79990001104"
-    reg = (await client.post("/auth/register",
-                             json={"phone": phone, "code": await _get_code(client, phone), "password": "secret123"})).json()
+    reg = (await _register(client, phone)).json()
     refreshed = await client.post("/auth/refresh", json={"refresh_token": reg["refresh_token"]})
     assert refreshed.status_code == 200
     # старый refresh после ротации отозван
@@ -95,8 +97,7 @@ async def test_login_bruteforce_throttled(client) -> None:
     from app.api.v1.auth import LOGIN_MAX_FAILS
 
     phone = "+79990001105"
-    await client.post("/auth/register",
-                      json={"phone": phone, "code": await _get_code(client, phone), "password": "secret123"})
+    await _register(client, phone)
 
     # Много неверных паролей подряд — счётчик доходит до лимита, затем 429.
     saw_rate_limited = False

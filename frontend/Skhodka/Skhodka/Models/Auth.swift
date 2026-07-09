@@ -26,9 +26,20 @@ struct RequestCodeResponse: Decodable {
     }
 }
 
+/// Ответ /auth/verify-code: тикет подтверждённого телефона для шага установки пароля.
+struct VerifyCodeResponse: Decodable {
+    let verificationToken: String
+    let isNewUser: Bool
+    private enum CodingKeys: String, CodingKey {
+        case verificationToken = "verification_token"
+        case isNewUser = "is_new_user"
+    }
+}
+
 // Тела запросов.
 struct PhoneBody: Encodable { let phone: String }
-struct RegisterBody: Encodable { let phone: String; let code: String; let password: String }
+struct VerifyCodeBody: Encodable { let phone: String; let code: String }
+struct RegisterBody: Encodable { let verification_token: String; let password: String }
 struct LoginBody: Encodable { let phone: String; let password: String }
 struct ResetPasswordBody: Encodable { let phone: String; let code: String; let new_password: String }
 struct RefreshBody: Encodable { let refresh_token: String }

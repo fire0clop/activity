@@ -10,7 +10,7 @@ struct RootView: View {
             case .loading:
                 ZStack { Theme.paper.ignoresSafeArea(); ProgressView().tint(Theme.accent) }
             case .signedOut:
-                LoginView()
+                signedOutRoot
             case .onboarding:
                 OnboardingView()
             case .signedIn:
@@ -21,6 +21,20 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .preferredColorScheme(.light)
+    }
+
+    @ViewBuilder
+    private var signedOutRoot: some View {
+        #if DEBUG
+        // Headless-скриншоты регистрации: UITEST_ROUTE начинается с "register".
+        if ProcessInfo.processInfo.environment["UITEST_ROUTE"]?.hasPrefix("register") == true {
+            NavigationStack { RegisterView() }
+        } else {
+            LoginView()
+        }
+        #else
+        LoginView()
+        #endif
     }
 }
 

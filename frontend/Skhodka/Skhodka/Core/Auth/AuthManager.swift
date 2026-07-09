@@ -108,11 +108,18 @@ final class AuthManager: ObservableObject {
         await refreshMe()
     }
 
-    /// Регистрация: телефон + код из SMS + пароль.
-    func register(phone: String, code: String, password: String) async throws {
+    /// Шаг 2: подтверждаем номер кодом из SMS → тикет для установки пароля.
+    func verifyCode(phone: String, code: String) async throws -> VerifyCodeResponse {
+        try await api.send(Endpoint(
+            path: "/auth/verify-code", method: .post,
+            body: VerifyCodeBody(phone: phone, code: code), requiresAuth: false))
+    }
+
+    /// Шаг 3: тикет подтверждённого телефона + выбранный пароль → аккаунт.
+    func register(verificationToken: String, password: String) async throws {
         let pair: TokenPair = try await api.send(Endpoint(
             path: "/auth/register", method: .post,
-            body: RegisterBody(phone: phone, code: code, password: password), requiresAuth: false))
+            body: RegisterBody(verification_token: verificationToken, password: password), requiresAuth: false))
         await applyTokens(pair)
     }
 
