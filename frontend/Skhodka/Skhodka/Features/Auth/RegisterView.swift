@@ -206,12 +206,3 @@ struct RegisterView: View {
         }
     }
 }
-
-/// Единый стиль поля ввода на бумажном фоне.
-private struct FieldStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding().background(Theme.secondaryBg)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-    }
-}

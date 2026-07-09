@@ -165,10 +165,12 @@ async def login(body: LoginIn, db: DbSession, redis: RedisDep) -> TokenPair:
 
 
 @router.post("/reset-password", response_model=TokenPair)
-async def reset_password(body: ResetPasswordIn, db: DbSession, redis: RedisDep) -> TokenPair:
-    """Смена пароля с подтверждением по SMS. Сбрасывает все старые сессии."""
-    await otp_service.verify_code(redis, body.phone, body.code)
-    user = (await db.execute(select(User).where(User.phone == body.phone))).scalar_one_or_none()
+async def reset_password(body: ResetPasswordIn, db: DbSession) -> TokenPair:
+    """Смена пароля по тикету подтверждённого телефона (шаг после verify-code).
+    Сбрасывает все старые сессии."""
+    payload = decode_token(body.verification_token, expected_type="phone_verify")
+    phone = payload["sub"]
+    user = (await db.execute(select(User).where(User.phone == phone))).scalar_one_or_none()
     if user is None:
         raise not_found("Пользователь не найден")
     user.password_hash = hash_password(body.new_password)

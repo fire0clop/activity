@@ -100,6 +100,15 @@ struct FormDivider: View {
     var body: some View { Divider().background(Theme.line) }
 }
 
+/// Единый стиль поля ввода на бумажном фоне (auth-экраны).
+struct FieldStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding().background(Theme.secondaryBg)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+    }
+}
+
 /// Ряд метрик с вертикальными разделителями — единый компонент для детали события и профиля.
 struct MetricsRow: View {
     struct Metric { let value: String; let label: String }

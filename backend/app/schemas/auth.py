@@ -57,8 +57,7 @@ class LoginIn(BaseModel):
 # --- Смена/сброс пароля (подтверждение по SMS) ----------------------------
 
 class ResetPasswordIn(BaseModel):
-    phone: PhoneStr
-    code: str
+    verification_token: str
     new_password: str = Field(..., min_length=6, max_length=128)
 
 

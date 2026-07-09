@@ -72,9 +72,11 @@ async def test_register_then_login_with_password(client) -> None:
 async def test_reset_password(client) -> None:
     phone = "+79990001103"
     await _register(client, phone, "oldpass1")
-    # смена пароля по коду
+    # смена пароля: подтверждаем номер → тикет → новый пароль
+    code = await _get_code(client, phone)
+    vt = (await client.post("/auth/verify-code", json={"phone": phone, "code": code})).json()["verification_token"]
     reset = await client.post("/auth/reset-password",
-                              json={"phone": phone, "code": await _get_code(client, phone), "new_password": "newpass2"})
+                              json={"verification_token": vt, "new_password": "newpass2"})
     assert reset.status_code == 200
     # старый пароль больше не работает, новый — да
     assert (await client.post("/auth/login", json={"phone": phone, "password": "oldpass1"})).status_code == 401

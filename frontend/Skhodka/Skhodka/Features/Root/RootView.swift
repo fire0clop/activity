@@ -29,6 +29,8 @@ struct RootView: View {
         // Headless-скриншоты регистрации: UITEST_ROUTE начинается с "register".
         if ProcessInfo.processInfo.environment["UITEST_ROUTE"]?.hasPrefix("register") == true {
             NavigationStack { RegisterView() }
+        } else if ProcessInfo.processInfo.environment["UITEST_ROUTE"]?.hasPrefix("reset") == true {
+            NavigationStack { PasswordResetView() }
         } else {
             LoginView()
         }

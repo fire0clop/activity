@@ -131,11 +131,11 @@ final class AuthManager: ObservableObject {
         await applyTokens(pair)
     }
 
-    /// Смена/сброс пароля с подтверждением по SMS.
-    func resetPassword(phone: String, code: String, newPassword: String) async throws {
+    /// Смена/сброс пароля: тикет подтверждённого телефона (из verifyCode) + новый пароль.
+    func resetPassword(verificationToken: String, newPassword: String) async throws {
         let pair: TokenPair = try await api.send(Endpoint(
             path: "/auth/reset-password", method: .post,
-            body: ResetPasswordBody(phone: phone, code: code, new_password: newPassword),
+            body: ResetPasswordBody(verification_token: verificationToken, new_password: newPassword),
             requiresAuth: false))
         await applyTokens(pair)
     }
