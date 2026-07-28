@@ -49,6 +49,11 @@ services:
       AUTO_CREATE_TABLES: "false"
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      # Медиа переживает рестарт; секреты (apns.p8, fcm.json) монтируются с хоста,
+      # а не запекаются в образ.
+      - media_data:/app/media
+      - ./secrets:/app/secrets:ro
     restart: unless-stopped
     depends_on:
       db:
@@ -66,3 +71,4 @@ services:
 
 volumes:
   pg_data:
+  media_data:
