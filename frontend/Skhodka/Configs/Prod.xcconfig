@@ -3,4 +3,4 @@
 API_SCHEME = https
 WS_SCHEME = wss
 
-API_HOST = api.skhodka.example
+API_HOST = api.event-serv.ru
