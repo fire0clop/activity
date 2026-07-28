@@ -39,7 +39,7 @@ class UserPublic(BaseModel):
 
 
 class UserPrivate(UserPublic):
-    phone: str
+    phone: str | None
     is_phone_verified: bool
     birth_date: date | None
     profile_completed: bool

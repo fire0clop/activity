@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 /// Стартовый экран: вход по телефону и паролю (без SMS).
@@ -42,6 +43,17 @@ struct LoginView: View {
                     Task { await login() }
                 }
 
+                orDivider
+
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.fullName, .email]
+                } onCompletion: { result in
+                    Task { await handleApple(result) }
+                }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+
                 HStack {
                     NavigationLink("Регистрация") { RegisterView() }
                     Spacer()
@@ -59,6 +71,14 @@ struct LoginView: View {
         }
     }
 
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(Theme.line).frame(height: 1)
+            Text("или").font(.footnote).foregroundStyle(Theme.ink2)
+            Rectangle().fill(Theme.line).frame(height: 1)
+        }
+    }
+
     private func login() async {
         isLoading = true; errorText = nil
         defer { isLoading = false }
@@ -67,5 +87,30 @@ struct LoginView: View {
         } catch let err as APIError {
             errorText = err.message
         } catch { errorText = "Нет соединения с сервером" }
+    }
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .success(let authResult):
+            guard let cred = authResult.credential as? ASAuthorizationAppleIDCredential,
+                  let data = cred.identityToken,
+                  let token = String(data: data, encoding: .utf8) else {
+                errorText = "Не удалось получить данные Apple"; return
+            }
+            // Имя Apple присылает только при первом входе.
+            let name = [cred.fullName?.givenName, cred.fullName?.familyName]
+                .compactMap { $0 }.joined(separator: " ")
+            isLoading = true; errorText = nil
+            defer { isLoading = false }
+            do {
+                try await auth.signInWithApple(identityToken: token, fullName: name.isEmpty ? nil : name)
+            } catch let err as APIError { errorText = err.message }
+            catch { errorText = "Не удалось войти через Apple" }
+        case .failure(let err):
+            // Отмену пользователем не считаем ошибкой.
+            if (err as? ASAuthorizationError)?.code != .canceled {
+                errorText = "Не удалось войти через Apple"
+            }
+        }
     }
 }

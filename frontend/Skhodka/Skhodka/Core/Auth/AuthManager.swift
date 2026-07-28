@@ -123,6 +123,15 @@ final class AuthManager: ObservableObject {
         await applyTokens(pair)
     }
 
+    /// Вход через Apple: identity token (+ имя при первом входе) → аккаунт.
+    func signInWithApple(identityToken: String, fullName: String?) async throws {
+        let pair: TokenPair = try await api.send(Endpoint(
+            path: "/auth/apple", method: .post,
+            body: AppleSignInBody(identity_token: identityToken, full_name: fullName),
+            requiresAuth: false))
+        await applyTokens(pair)
+    }
+
     /// Вход по паролю (без SMS).
     func login(phone: String, password: String) async throws {
         let pair: TokenPair = try await api.send(Endpoint(

@@ -41,5 +41,6 @@ struct PhoneBody: Encodable { let phone: String }
 struct VerifyCodeBody: Encodable { let phone: String; let code: String }
 struct RegisterBody: Encodable { let verification_token: String; let password: String }
 struct LoginBody: Encodable { let phone: String; let password: String }
+struct AppleSignInBody: Encodable { let identity_token: String; let full_name: String? }
 struct ResetPasswordBody: Encodable { let verification_token: String; let new_password: String }
 struct RefreshBody: Encodable { let refresh_token: String }

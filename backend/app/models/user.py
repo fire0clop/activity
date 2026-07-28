@@ -1,7 +1,17 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKey
@@ -9,8 +19,18 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKey
 
 class User(Base, UUIDPrimaryKey, TimestampMixin):
     __tablename__ = "users"
+    __table_args__ = (
+        # Идентификатор обязателен: телефон ИЛИ Apple (у Apple-пользователей телефона нет).
+        CheckConstraint(
+            "phone IS NOT NULL OR apple_user_id IS NOT NULL",
+            name="ck_users_has_identity",
+        ),
+    )
 
-    phone: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, nullable=True)
+    apple_user_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     bio: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -61,6 +61,12 @@ class ResetPasswordIn(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=128)
 
 
+class AppleSignInIn(BaseModel):
+    identity_token: str
+    # Имя Apple отдаёт только при ПЕРВОМ входе — прокидываем для предзаполнения профиля.
+    full_name: str | None = Field(default=None, max_length=120)
+
+
 class RefreshIn(BaseModel):
     refresh_token: str
 

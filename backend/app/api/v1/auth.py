@@ -18,6 +18,7 @@ from app.core.security import (
 )
 from app.models.user import RefreshToken, User
 from app.schemas.auth import (
+    AppleSignInIn,
     LoginIn,
     LogoutIn,
     RefreshIn,
@@ -30,7 +31,7 @@ from app.schemas.auth import (
     VerifyCodeIn,
     VerifyCodeOut,
 )
-from app.services import otp_service
+from app.services import apple_auth, otp_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -148,6 +149,25 @@ async def register(body: RegisterIn, db: DbSession) -> RegisterOut:
     user.tos_accepted_version = settings.tos_version
     await db.flush()
 
+    pair = await _issue_pair(db, user.id)
+    return RegisterOut(**pair.model_dump(), is_new_user=is_new_user)
+
+
+@router.post("/apple", response_model=RegisterOut)
+async def apple_sign_in(body: AppleSignInIn, db: DbSession) -> RegisterOut:
+    """Вход через Apple: проверяем identity token, находим/создаём пользователя по Apple ID."""
+    apple_user_id, _email = apple_auth.verify_identity_token(body.identity_token)
+    user = (
+        await db.execute(select(User).where(User.apple_user_id == apple_user_id))
+    ).scalar_one_or_none()
+    is_new_user = user is None
+    if user is None:
+        user = User(apple_user_id=apple_user_id, is_phone_verified=False)
+        if body.full_name:
+            user.name = body.full_name  # Apple отдаёт имя только при первом входе
+        user.tos_accepted_version = settings.tos_version
+        db.add(user)
+        await db.flush()
     pair = await _issue_pair(db, user.id)
     return RegisterOut(**pair.model_dump(), is_new_user=is_new_user)
 

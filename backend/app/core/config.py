@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     apns_key_id: str = ""          # Key ID ключа
     apns_team_id: str = ""         # Team ID разработчика
     apns_bundle_id: str = "com.skhodka.app"
+
+    # Sign in with Apple: audience (client_id) = bundle id приложения.
+    apple_client_id: str = "com.skhodka.app"
     apns_use_sandbox: bool = True  # True для dev-сборок, False для App Store / TestFlight
 
     @property
