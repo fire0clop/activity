@@ -104,13 +104,15 @@ struct LoginView: View {
             defer { isLoading = false }
             do {
                 try await auth.signInWithApple(identityToken: token, fullName: name.isEmpty ? nil : name)
-            } catch let err as APIError { errorText = err.message }
-            catch { errorText = "Не удалось войти через Apple" }
+            } catch let err as APIError {
+                errorText = "Сервер: \(err.message)"           // бэкенд отклонил токен
+            } catch {
+                errorText = "Сеть: \(error.localizedDescription)"  // не достучались до бэкенда
+            }
         case .failure(let err):
             // Отмену пользователем не считаем ошибкой.
-            if (err as? ASAuthorizationError)?.code != .canceled {
-                errorText = "Не удалось войти через Apple"
-            }
+            if (err as? ASAuthorizationError)?.code == .canceled { return }
+            errorText = "Apple: \(err.localizedDescription)"   // сама авторизация Apple не прошла
         }
     }
 }
