@@ -12,24 +12,24 @@ struct FullScreenPhotoView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
-
-            TabView(selection: $index) {
-                ForEach(Array(images.enumerated()), id: \.offset) { i, url in
-                    ZoomableImage(urlString: url).tag(i)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: images.count > 1 ? .automatic : .never))
-            .ignoresSafeArea()
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.headline).foregroundStyle(.white)
-                    .padding(12).background(.black.opacity(0.5)).clipShape(Circle())
-            }
-            .padding()
-        }
+		ZStack(alignment: .topTrailing) {
+			Color.black.ignoresSafeArea()
+			
+			TabView(selection: $index) {
+				ForEach(Array(images.enumerated()), id: \.offset) { i, url in
+					ZoomableImage(urlString: url).tag(i)
+				}
+			}
+			.tabViewStyle(.page(indexDisplayMode: images.count > 1 ? .automatic : .never))
+			.ignoresSafeArea()
+			
+			Button { dismiss() } label: {
+				Image(systemName: "xmark")
+					.font(.headline).foregroundStyle(.white)
+					.padding(12).background(.black.opacity(0.5)).clipShape(Circle())
+			}
+			.padding()
+		}
     }
 }
 
