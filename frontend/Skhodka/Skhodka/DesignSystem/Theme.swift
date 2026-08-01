@@ -149,20 +149,82 @@ struct PrimaryButton: View {
     }
 }
 
+/// Рейтинг показываем только с первого отзыва.
+///
+/// Ноль или прочерк рядом со звездой читаются как плохая оценка, хотя означают
+/// лишь отсутствие истории. Поэтому без отзывов виджет либо пуст, либо (там, где
+/// это полезно собеседнику — например в списке заявок) показывает «Новичок».
 struct RatingView: View {
-    let value: Double
+    let value: Double?
+    let count: Int
+    /// Показать пометку «Новичок» вместо пустоты.
+    var showsNewcomer: Bool = false
+
+    var body: some View {
+        if let value, count > 0 {
+            HStack(spacing: 3) {
+                Image(systemName: "star.fill").foregroundStyle(Theme.star).font(.caption2)
+                Text(String(format: "%.1f", value))
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink2)
+                Text("(\(count))").font(.caption2).foregroundStyle(Theme.ink2)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Рейтинг \(String(format: "%.1f", value)) из 5, отзывов: \(count)")
+        } else if showsNewcomer {
+            Text("Новичок")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+                .padding(.horizontal, 7).padding(.vertical, 3)
+                .background(Theme.secondaryBg, in: Capsule())
+                .accessibilityLabel("Новичок, отзывов пока нет")
+        }
+    }
+}
+
+/// Вердикт одного отзыва: оценка звёздами либо отметка о неявке.
+///
+/// Отличается от `RatingView` тем, что показывает конкретный отзыв, а не репутацию
+/// целиком — здесь оценка есть всегда, кроме случая «не пришёл».
+struct ReviewVerdict: View {
+    let rating: Int?
+    var attended: Bool = true
+
+    var body: some View {
+        if !attended {
+            HStack(spacing: 3) {
+                Image(systemName: "person.fill.xmark").font(.system(size: 10, weight: .bold))
+                Text("не пришёл").font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(Theme.danger)
+            .accessibilityLabel("Отмечен как не пришедший")
+        } else if let rating {
+            HStack(spacing: 2) {
+                ForEach(1...5, id: \.self) { i in
+                    Image(systemName: i <= rating ? "star.fill" : "star")
+                        .font(.system(size: 10))
+                        .foregroundStyle(i <= rating ? Theme.star : Theme.line)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Оценка \(rating) из 5")
+        }
+    }
+}
+
+/// Пометка о неявках. Появляется только когда факт есть — молчание тут лучше нуля.
+struct NoShowBadge: View {
     let count: Int
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "star.fill").foregroundStyle(Theme.star).font(.caption2)
-            Text(count > 0 ? String(format: "%.1f", value) : "—")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink2)
-            if count > 0 { Text("(\(count))").font(.caption2).foregroundStyle(Theme.ink2) }
+        if count > 0 {
+            HStack(spacing: 3) {
+                Image(systemName: "person.fill.xmark").font(.system(size: 10, weight: .bold))
+                Text("не пришёл \(count)×").font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(Theme.danger)
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .background(Theme.danger.opacity(0.1), in: Capsule())
+            .accessibilityLabel("Не пришёл \(count) раз")
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(count > 0
-            ? "Рейтинг \(String(format: "%.1f", value)) из 5, отзывов: \(count)"
-            : "Рейтинга пока нет")
     }
 }
 

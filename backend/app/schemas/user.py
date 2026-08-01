@@ -6,6 +6,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models.user import User
 
 
+def rating_or_none(u: User) -> float | None:
+    """Рейтинг существует только с первого отзыва.
+
+    Ноль наружу не отдаём никогда: «0.0» читается как худшая возможная оценка,
+    хотя означает лишь отсутствие истории. Клиент по null показывает «новичок».
+    """
+    return float(u.rating_avg) if u.rating_count > 0 else None
+
+
 class UserPublic(BaseModel):
     id: uuid.UUID
     name: str | None
@@ -14,10 +23,11 @@ class UserPublic(BaseModel):
     photo_urls: list[str]
     gender: str
     age: int | None
-    rating_avg: float
+    rating_avg: float | None
     rating_count: int
     events_created: int
     events_attended: int
+    no_show_count: int
     member_since: datetime
 
     @classmethod
@@ -30,10 +40,11 @@ class UserPublic(BaseModel):
             photo_urls=list(u.photo_urls or []),
             gender=u.gender,
             age=u.age,
-            rating_avg=float(u.rating_avg),
+            rating_avg=rating_or_none(u),
             rating_count=u.rating_count,
             events_created=u.events_created,
             events_attended=u.events_attended,
+            no_show_count=u.no_show_count,
             member_since=u.created_at,
         )
 
@@ -63,7 +74,18 @@ class UserBrief(BaseModel):
     id: uuid.UUID
     name: str | None
     avatar_url: str | None
-    rating_avg: float
+    rating_avg: float | None  # null, пока нет ни одного отзыва
+    rating_count: int = 0
+
+    @classmethod
+    def from_model(cls, u: User) -> "UserBrief":
+        return cls(
+            id=u.id,
+            name=u.name,
+            avatar_url=u.avatar_url,
+            rating_avg=rating_or_none(u),
+            rating_count=u.rating_count,
+        )
 
 
 class UpdateProfileIn(BaseModel):
