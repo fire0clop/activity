@@ -40,10 +40,16 @@ class User(Base, UUIDPrimaryKey, TimestampMixin):
     # gender: male | female | other | unspecified
     gender: Mapped[str] = mapped_column(String(16), default="unspecified", nullable=False)
 
+    # rating_avg имеет смысл только при rating_count > 0: наружу отдаём null, а не 0,
+    # чтобы новичок не выглядел человеком с худшей возможной оценкой.
     rating_avg: Mapped[float] = mapped_column(Numeric(3, 2), default=0, nullable=False)
     rating_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     events_created: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     events_attended: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Сколько раз человека отметили как не пришедшего — считается по отзывам с attended=false.
+    no_show_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Модерация: заблокированный оператором пользователь не проходит аутентификацию.

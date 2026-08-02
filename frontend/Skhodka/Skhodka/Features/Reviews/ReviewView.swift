@@ -7,6 +7,8 @@ struct ReviewView: View {
     @State private var ratings: [String: Int] = [:]
     @State private var comments: [String: String] = [:]
     @State private var done: Set<String> = []
+    /// Кого отмечают как не пришедшего: оценки у такого отзыва нет.
+    @State private var noShows: Set<String> = []
     @State private var errorText: String?
 
     private var targets: [OrganizerBrief] {
@@ -29,11 +31,23 @@ struct ReviewView: View {
                         }
                     }
                     if !done.contains(p.id) {
-                        StarPicker(rating: binding(for: p.id))
-                        TextField("Комментарий (необязательно)", text: commentBinding(for: p.id), axis: .vertical)
+                        let absent = noShows.contains(p.id)
+                        if absent {
+                            Text("Отмечаем, что человек не пришёл. Оценка не ставится — это не «единица», а отдельный факт в профиле.")
+                                .font(.footnote).foregroundStyle(Theme.ink2)
+                        } else {
+                            StarPicker(rating: binding(for: p.id))
+                        }
+                        TextField(absent ? "Что случилось (необязательно)" : "Комментарий (необязательно)",
+                                  text: commentBinding(for: p.id), axis: .vertical)
                             .lineLimit(1...3)
-                        Button("Отправить отзыв") { Task { await submit(p) } }
-                            .disabled((ratings[p.id] ?? 0) == 0)
+                        Button(absent ? "Отметить неявку" : "Отправить отзыв") { Task { await submit(p) } }
+                            .disabled(!absent && (ratings[p.id] ?? 0) == 0)
+                        Button(absent ? "Всё-таки пришёл — поставить оценку" : "Не пришёл") {
+                            if absent { noShows.remove(p.id) } else { noShows.insert(p.id) }
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(absent ? Theme.accentInk : Theme.danger)
                     }
                 }
             }
@@ -55,9 +69,12 @@ struct ReviewView: View {
     private func submit(_ p: OrganizerBrief) async {
         errorText = nil
         let comment = comments[p.id]?.trimmingCharacters(in: .whitespaces)
+        let attended = !noShows.contains(p.id)
         let body = ReviewCreateBody(
-            target_id: p.id, rating: ratings[p.id] ?? 0,
-            comment: (comment?.isEmpty == false) ? comment : nil)
+            target_id: p.id,
+            rating: attended ? (ratings[p.id] ?? 0) : nil,
+            comment: (comment?.isEmpty == false) ? comment : nil,
+            attended: attended)
         do {
             let _: Review = try await auth.api.send(Endpoint(
                 path: "/events/\(event.id)/reviews", method: .post, body: body))
