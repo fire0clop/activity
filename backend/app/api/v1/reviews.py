@@ -17,14 +17,30 @@ router = APIRouter(tags=["reviews"])
 
 
 async def _recalc_rating(db: DbSession, target_id: uuid.UUID) -> None:
-    result = await db.execute(
-        select(func.avg(Review.rating), func.count()).where(Review.target_id == target_id)
-    )
-    avg, count = result.one()
+    """Пересчёт репутации: средняя оценка — только по состоявшимся встречам.
+
+    Отзыв «не пришёл» оценки не несёт и в среднее не попадает — иначе неявка
+    маскировалась бы под низкую оценку. Она считается отдельным счётчиком.
+    """
+    avg, count = (
+        await db.execute(
+            select(func.avg(Review.rating), func.count(Review.rating)).where(
+                Review.target_id == target_id, Review.attended.is_(True)
+            )
+        )
+    ).one()
+    no_shows = (
+        await db.execute(
+            select(func.count())
+            .select_from(Review)
+            .where(Review.target_id == target_id, Review.attended.is_(False))
+        )
+    ).scalar() or 0
     user = await db.get(User, target_id)
     if user is not None:
         user.rating_avg = round(float(avg or 0), 2)
         user.rating_count = int(count or 0)
+        user.no_show_count = int(no_shows)
 
 
 @router.post("/events/{event_id}/reviews", response_model=ReviewOut,
@@ -72,6 +88,7 @@ async def create_review(
         target_id=body.target_id,
         rating=body.rating,
         comment=body.comment,
+        attended=body.attended,
     )
     db.add(review)
     await db.flush()
@@ -86,6 +103,7 @@ async def create_review(
         target_id=review.target_id,
         rating=review.rating,
         comment=review.comment,
+        attended=review.attended,
         created_at=review.created_at,
     )
 
@@ -121,6 +139,7 @@ async def list_user_reviews(
             target_id=r.target_id,
             rating=r.rating,
             comment=r.comment,
+            attended=r.attended,
             created_at=r.created_at,
         )
         for r, author in rows

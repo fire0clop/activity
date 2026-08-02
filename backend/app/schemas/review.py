@@ -1,15 +1,25 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.user import UserPublic
 
 
 class ReviewCreateIn(BaseModel):
     target_id: uuid.UUID
-    rating: int = Field(..., ge=1, le=5)
+    rating: int | None = Field(default=None, ge=1, le=5)
     comment: str | None = None
+    attended: bool = True
+
+    @model_validator(mode="after")
+    def check_rating_matches_attendance(self) -> "ReviewCreateIn":
+        """Оценка и явка связаны: пришёл — ставим звёзды, не пришёл — оценивать нечего."""
+        if self.attended and self.rating is None:
+            raise ValueError("Поставьте оценку от 1 до 5")
+        if not self.attended:
+            self.rating = None
+        return self
 
 
 class ReviewOut(BaseModel):
@@ -17,8 +27,9 @@ class ReviewOut(BaseModel):
     event_id: uuid.UUID
     author: UserPublic
     target_id: uuid.UUID
-    rating: int
+    rating: int | None
     comment: str | None
+    attended: bool
     created_at: datetime
 
 
