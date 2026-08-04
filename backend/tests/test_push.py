@@ -122,3 +122,80 @@ async def test_invalid_token_pruned(client, user_factory, monkeypatch) -> None:
         left = (await db.execute(
             select(DeviceToken).where(DeviceToken.token == "tok-dead"))).scalars().all()
     assert left == []
+
+
+@pytest.mark.asyncio
+async def test_cancel_event_notifies_participants(client, user_factory, apns_recorder) -> None:
+    """Отмена не должна проходить молча — люди уже спланировали это время."""
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    await client.post("/devices", headers=org["headers"],
+                      json={"token": "tok-org", "platform": "ios"})
+    await client.post("/devices", headers=guest["headers"],
+                      json={"token": "tok-guest", "platform": "ios"})
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=3))).json()["id"]
+    await client.post(f"/events/{eid}/join", headers=guest["headers"])
+
+    assert (await client.delete(f"/events/{eid}", headers=org["headers"])).status_code == 204
+
+    cancels = [p for p in apns_recorder if p["title"] == "Событие отменено"]
+    assert [p["token"] for p in cancels] == ["tok-guest"]  # автору себя же не шлём
+    assert cancels[0]["data"]["event_id"] == eid
+
+
+@pytest.mark.asyncio
+async def test_reschedule_notifies_participants(client, user_factory, apns_recorder) -> None:
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    await client.post("/devices", headers=guest["headers"],
+                      json={"token": "tok-guest", "platform": "ios"})
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=3))).json()["id"]
+    await client.post(f"/events/{eid}/join", headers=guest["headers"])
+
+    new_time = (datetime.now(UTC) + timedelta(days=2)).isoformat()
+    resp = await client.patch(f"/events/{eid}", headers=org["headers"],
+                              json={"starts_at": new_time, "address": "у пирса №3"})
+    assert resp.status_code == 200
+
+    changed = [p for p in apns_recorder if p["title"] == "Событие изменилось"]
+    assert changed and changed[-1]["token"] == "tok-guest"
+    assert "новое время" in changed[-1]["body"]
+    assert "у пирса №3" in changed[-1]["body"]
+
+
+@pytest.mark.asyncio
+async def test_cosmetic_edit_does_not_notify(client, user_factory, apns_recorder) -> None:
+    """Правка описания — не повод будить телефон."""
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    await client.post("/devices", headers=guest["headers"],
+                      json={"token": "tok-guest", "platform": "ios"})
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=3))).json()["id"]
+    await client.post(f"/events/{eid}/join", headers=guest["headers"])
+
+    await client.patch(f"/events/{eid}", headers=org["headers"],
+                       json={"description": "возьмите воду"})
+    assert not [p for p in apns_recorder if p["title"] == "Событие изменилось"]
+
+
+@pytest.mark.asyncio
+async def test_removed_participant_gets_push(client, user_factory, apns_recorder) -> None:
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    await client.post("/devices", headers=guest["headers"],
+                      json={"token": "tok-guest", "platform": "ios"})
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=3))).json()["id"]
+    await client.post(f"/events/{eid}/join", headers=guest["headers"])
+
+    pid = next(
+        p["participation_id"]
+        for p in (await client.get(f"/events/{eid}/participants", headers=org["headers"],
+                                   params={"status": "accepted"})).json()["items"]
+        if p["user"]["id"] == guest["id"]
+    )
+    await client.delete(f"/participations/{pid}", headers=org["headers"])
+    assert any(p["title"] == "Вы больше не в составе" for p in apns_recorder)
