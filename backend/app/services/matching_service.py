@@ -122,6 +122,37 @@ def format_time(event: Event) -> str:
     return f"📍 Встречаемся {t} (UTC). Место: {place}"
 
 
+async def notify_participants(
+    db: AsyncSession,
+    event: Event,
+    title: str,
+    body: str,
+    *,
+    statuses: tuple[str, ...] = ("accepted", "pending", "waitlisted"),
+    exclude_user_id: uuid.UUID | None = None,
+) -> int:
+    """Разослать пуш всем, кто завязан на событие.
+
+    Нужно там, где организатор меняет договорённость: отмена, перенос времени, смена
+    места. Молчание здесь — худший из возможных сценариев: люди приедут не туда и не тогда.
+    """
+    user_ids = (
+        await db.execute(
+            select(Participation.user_id).where(
+                Participation.event_id == event.id,
+                Participation.status.in_(statuses),
+            )
+        )
+    ).scalars().all()
+    sent = 0
+    for uid in user_ids:
+        if exclude_user_id is not None and uid == exclude_user_id:
+            continue
+        await push_service.send_push(db, uid, title, body, {"event_id": str(event.id)})
+        sent += 1
+    return sent
+
+
 async def on_accept(db: AsyncSession, event: Event, participant: User) -> None:
     """ТОЛЬКО побочные эффекты подтверждения (чат, раскрытие времени, счётчик, push).
 
