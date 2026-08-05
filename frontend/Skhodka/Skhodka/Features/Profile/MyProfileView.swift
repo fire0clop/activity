@@ -118,6 +118,28 @@ struct MyProfileView: View {
                 .padding(.horizontal, 14).padding(.vertical, 14)
             }
             Divider().background(Theme.line).padding(.leading, 50)
+            NavigationLink { ConnectionsView() } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2.fill").font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.accent).frame(width: 26)
+                    Text("Знакомые").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.ink2)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 14)
+            }
+            Divider().background(Theme.line).padding(.leading, 50)
+            NavigationLink { MyApplicationsView() } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "paperplane.fill").font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.accent).frame(width: 26)
+                    Text("Мои заявки").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.ink2)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 14)
+            }
+            Divider().background(Theme.line).padding(.leading, 50)
             actionRow("Телефон", value: auth.me?.phone ?? "", icon: "phone.fill") {}
             Divider().background(Theme.line).padding(.leading, 50)
             actionRow("Сменить пароль", value: nil, icon: "lock.fill") { showPasswordReset = true }
