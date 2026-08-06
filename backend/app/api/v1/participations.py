@@ -2,17 +2,24 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
 from app.core.exceptions import conflict, forbidden, not_found
+from app.models.conversation import Conversation, ConversationMember
 from app.models.event import Event
 from app.models.participation import Participation
 from app.models.user import User
-from app.schemas.participation import JoinOut, ParticipantItem, ParticipantsOut
+from app.schemas.participation import (
+    JoinOut,
+    MyApplicationItem,
+    MyApplicationsOut,
+    ParticipantItem,
+    ParticipantsOut,
+)
 from app.schemas.user import UserPublic
-from app.services import matching_service, push_service
+from app.services import event_service, matching_service, push_service
 from app.services.rate_limit import check_user_action
 
 router = APIRouter(tags=["participations"])
@@ -54,7 +61,9 @@ async def join_event(
         raise not_found("Событие не найдено")
     count = await matching_service.accepted_count(db, event_id)
     has_space = locked.max_participants is None or count < locked.max_participants
-    if locked.auto_accept and has_space:
+    # Приглашение — это уже согласие организатора: заново рассматривать заявку не нужно.
+    was_invited = part is not None and part.status == "invited"
+    if (locked.auto_accept or was_invited) and has_space:
         new_status = "accepted"
     elif has_space:
         new_status = "pending"
@@ -76,6 +85,12 @@ async def join_event(
 
     if new_status == "accepted":
         await matching_service.on_accept(db, locked, current_user)
+        if was_invited:  # организатор ждёт ответа на своё приглашение
+            await push_service.send_push(
+                db, event.organizer_id, "Придёт",
+                f"{current_user.name} принял ваше приглашение на «{event.title}»",
+                {"event_id": str(event_id)},
+            )
     else:
         await push_service.send_push(
             db, event.organizer_id, "Новая заявка",
@@ -104,6 +119,66 @@ async def leave_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSess
         # promote_waitlist берёт блокировку события, продвигает лист ожидания и синхронизирует
         # статус open/full под ней — ручной сброс full→open здесь больше не нужен (гонки нет).
         await matching_service.promote_waitlist(db, event)
+
+
+ACTIVE_APPLICATION_STATUSES = ("invited", "pending", "accepted", "waitlisted")
+
+
+@router.get("/participations/mine", response_model=MyApplicationsOut)
+async def my_applications(
+    current_user: CurrentUser,
+    db: DbSession,
+    status_filter: str | None = Query(
+        None, alias="status", pattern="^(invited|pending|accepted|waitlisted|rejected|cancelled)$"
+    ),
+) -> MyApplicationsOut:
+    """Мои отклики одним списком.
+
+    До этого статус заявки жил только внутри карточки события: откликнулся на три
+    штуки — и вспоминай, где что. Здесь всё видно сразу, ближайшее сверху.
+    """
+    statuses = (status_filter,) if status_filter else ACTIVE_APPLICATION_STATUSES
+
+    # Количество принятых — коррелированным подзапросом, чтобы не делать запрос на событие.
+    accepted_sq = (
+        select(func.count())
+        .select_from(Participation)
+        .where(Participation.event_id == Event.id, Participation.status == "accepted")
+        .correlate(Event)
+        .scalar_subquery()
+    )
+
+    rows = (
+        await db.execute(
+            select(Participation, Event, User, accepted_sq)
+            .join(Event, Event.id == Participation.event_id)
+            .join(User, User.id == Event.organizer_id)
+            .where(
+                Participation.user_id == current_user.id,
+                Participation.status.in_(statuses),
+            )
+            .order_by(Event.starts_at.asc())
+        )
+    ).all()
+
+    return MyApplicationsOut(
+        items=[
+            MyApplicationItem(
+                participation_id=part.id,
+                status=part.status,
+                created_at=part.created_at,
+                event=event_service.build_list_item(
+                    event,
+                    organizer,
+                    viewer_id=current_user.id,
+                    my_status=part.status,
+                    participants_current=accepted,
+                    distance_km=None,
+                ),
+            )
+            for part, event, organizer, accepted in rows
+        ]
+    )
 
 
 @router.get("/events/{event_id}/participants", response_model=ParticipantsOut)
@@ -185,3 +260,56 @@ async def reject_participation(
     participation_id: uuid.UUID, current_user: CurrentUser, db: DbSession
 ) -> JoinOut:
     return await _decide(participation_id, current_user, db, "reject")
+
+
+@router.delete("/participations/{participation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_participant(
+    participation_id: uuid.UUID, current_user: CurrentUser, db: DbSession
+) -> None:
+    """Организатор освобождает занятое место.
+
+    Раньше выхода не было: человек пропал — место оставалось мёртвым, и лист ожидания
+    не двигался. Статус ставим «rejected», как при отказе по заявке: повторно откликнуться
+    можно, а от навязчивых есть блокировка.
+    """
+    part = await db.get(Participation, participation_id)
+    if part is None:
+        raise not_found("Заявка не найдена")
+    event = await db.get(Event, part.event_id)
+    if event is None:
+        raise not_found("Событие не найдено")
+    if event.organizer_id != current_user.id:
+        raise forbidden("Только организатор может убрать участника")
+    if part.user_id == event.organizer_id:
+        raise conflict("cannot_remove_organizer", "Организатора нельзя убрать из своего события")
+    if part.status not in ("accepted", "pending", "waitlisted", "invited"):
+        raise conflict("not_participating", "Этот человек и так не в составе")
+
+    was_accepted = part.status == "accepted"
+    part.status = "rejected"
+    part.decided_at = datetime.now(UTC)
+    await db.commit()
+
+    # Убираем из беседы события: доступа к переписке у выбывшего быть не должно.
+    conv_id = (
+        await db.execute(select(Conversation.id).where(Conversation.event_id == event.id))
+    ).scalar_one_or_none()
+    if conv_id is not None:
+        member = (
+            await db.execute(
+                select(ConversationMember).where(
+                    ConversationMember.conversation_id == conv_id,
+                    ConversationMember.user_id == part.user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if member is not None:
+            await db.delete(member)
+            await db.commit()
+
+    await push_service.send_push(
+        db, part.user_id, "Вы больше не в составе",
+        f"Организатор «{event.title}» освободил ваше место", {"event_id": str(event.id)},
+    )
+    if was_accepted:
+        await matching_service.promote_waitlist(db, event)
