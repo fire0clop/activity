@@ -106,3 +106,89 @@ async def test_reject(client, user_factory) -> None:
     pid = parts[0]["participation_id"]
     rej = await client.post(f"/participations/{pid}/reject", headers=org["headers"])
     assert rej.json()["status"] == "rejected"
+
+
+@pytest.mark.asyncio
+async def test_my_applications_lists_active_only(client, user_factory) -> None:
+    """Свои отклики видно одним списком, а не по одному внутри карточек."""
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    e1 = (await client.post("/events", headers=org["headers"],
+                            json=_body(title="Теннис"))).json()["id"]
+    e2 = (await client.post("/events", headers=org["headers"],
+                            json=_body(title="Прогулка", auto_accept=True))).json()["id"]
+
+    await client.post(f"/events/{e1}/join", headers=guest["headers"])   # pending
+    await client.post(f"/events/{e2}/join", headers=guest["headers"])   # accepted
+
+    items = (await client.get("/participations/mine", headers=guest["headers"])).json()["items"]
+    by_title = {i["event"]["title"]: i["status"] for i in items}
+    assert by_title == {"Теннис": "pending", "Прогулка": "accepted"}
+
+    # отменённый отклик уходит из активного списка, но доступен фильтром
+    await client.delete(f"/events/{e1}/join", headers=guest["headers"])
+    active = (await client.get("/participations/mine", headers=guest["headers"])).json()["items"]
+    assert [i["event"]["title"] for i in active] == ["Прогулка"]
+
+    cancelled = (await client.get("/participations/mine", headers=guest["headers"],
+                                  params={"status": "cancelled"})).json()["items"]
+    assert [i["event"]["title"] for i in cancelled] == ["Теннис"]
+
+
+@pytest.mark.asyncio
+async def test_organizer_removes_participant_and_waitlist_moves(client, user_factory) -> None:
+    """Освобождённое место должно уходить очереди, а не пропадать."""
+    org = await user_factory("Орг")
+    g1 = await user_factory("Гость1")
+    g2 = await user_factory("Гость2")
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=2))).json()["id"]
+
+    assert (await client.post(f"/events/{eid}/join",
+                              headers=g1["headers"])).json()["status"] == "accepted"
+    assert (await client.post(f"/events/{eid}/join",
+                              headers=g2["headers"])).json()["status"] == "waitlisted"
+
+    pid = next(
+        p["participation_id"]
+        for p in (await client.get(f"/events/{eid}/participants", headers=org["headers"],
+                                   params={"status": "accepted"})).json()["items"]
+        if p["user"]["id"] == g1["id"]
+    )
+    assert (await client.delete(f"/participations/{pid}",
+                                headers=org["headers"])).status_code == 204
+
+    # g1 выбыл, g2 подтянулся из очереди
+    d1 = (await client.get(f"/events/{eid}", headers=g1["headers"])).json()
+    assert d1["my_participation"]["status"] == "rejected"
+    d2 = (await client.get(f"/events/{eid}", headers=g2["headers"])).json()
+    assert d2["my_participation"]["status"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_remove_participant_requires_organizer(client, user_factory) -> None:
+    org = await user_factory("Орг")
+    g1 = await user_factory("Гость1")
+    other = await user_factory("Посторонний")
+    eid = (await client.post("/events", headers=org["headers"],
+                             json=_body(auto_accept=True, max_participants=3))).json()["id"]
+    await client.post(f"/events/{eid}/join", headers=g1["headers"])
+
+    pid = next(
+        p["participation_id"]
+        for p in (await client.get(f"/events/{eid}/participants", headers=org["headers"],
+                                   params={"status": "accepted"})).json()["items"]
+        if p["user"]["id"] == g1["id"]
+    )
+    assert (await client.delete(f"/participations/{pid}",
+                                headers=other["headers"])).status_code == 403
+
+    # и самого себя организатор из состава не выкинет
+    own = next(
+        p["participation_id"]
+        for p in (await client.get(f"/events/{eid}/participants", headers=org["headers"],
+                                   params={"status": "accepted"})).json()["items"]
+        if p["user"]["id"] == org["id"]
+    )
+    assert (await client.delete(f"/participations/{own}",
+                                headers=org["headers"])).status_code == 409
