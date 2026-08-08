@@ -7,10 +7,12 @@ from app.api.v1 import (
     admin,
     auth,
     chat,
+    connections,
     conversations,
     events,
     participations,
     reports,
+    requests,
     reviews,
     subscriptions,
     users,
@@ -45,6 +47,8 @@ api_router.include_router(users.router)
 api_router.include_router(events.router)
 api_router.include_router(participations.router)
 api_router.include_router(conversations.router)
+api_router.include_router(connections.router)
+api_router.include_router(requests.router)
 api_router.include_router(reviews.router)
 api_router.include_router(reports.router)
 api_router.include_router(subscriptions.router)
