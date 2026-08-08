@@ -9,6 +9,7 @@ from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.event import PhotosOut
 from app.schemas.user import UpdateProfileIn, UserPrivate, UserPublic
+from app.services import connection_service
 from app.services.storage_service import get_storage
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -125,4 +126,13 @@ async def unfollow_user(user_id: uuid.UUID, current_user: CurrentUser, db: DbSes
 
 @router.get("/{user_id}/follow-status")
 async def follow_status(user_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> dict:
-    return {"following": await _find_follow(db, current_user.id, user_id) is not None}
+    """Отношение зрителя к этому человеку: подписка и факт совместной встречи.
+
+    `met` решает, доступна ли кнопка «Написать»: личный чат открывается встречей.
+    Считается здесь, а не в UserPublic, — иначе пришлось бы считать это на каждого
+    человека в каждом списке.
+    """
+    return {
+        "following": await _find_follow(db, current_user.id, user_id) is not None,
+        "met": await connection_service.have_met(db, current_user.id, user_id),
+    }

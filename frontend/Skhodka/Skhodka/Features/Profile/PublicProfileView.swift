@@ -1,7 +1,5 @@
 import SwiftUI
 
-private struct FollowStatus: Decodable { let following: Bool }
-
 struct PublicProfileView: View {
     let userID: String
     @EnvironmentObject var auth: AuthManager
@@ -17,6 +15,10 @@ struct PublicProfileView: View {
     @State private var fullScreen = false
     @State private var startIndex = 0
     @State private var reviews: [Review] = []
+    /// Виделись ли мы — от этого зависит право на личную переписку.
+    @State private var haveMet = false
+    @State private var openingChat = false
+    @State private var directChatID: String?
 
     var body: some View {
         ScrollView {
@@ -40,6 +42,9 @@ struct PublicProfileView: View {
             FullScreenPhotoView(images: user?.photoURLs ?? [], start: startIndex)
         }
         .task { await load() }
+        .navigationDestination(item: $directChatID) { cid in
+            ChatView(conversationID: cid, title: user?.name ?? "Переписка")
+        }
         .confirmationDialog("Пожаловаться на пользователя", isPresented: $showReport, titleVisibility: .visible) {
             Button("Спам") { Task { await report("spam") } }
             Button("Неуместное поведение") { Task { await report("inappropriate") } }
@@ -60,7 +65,11 @@ struct PublicProfileView: View {
         VStack(spacing: 16) {
             avatar(u.avatarURL, name: u.name).frame(width: 96, height: 96)
             Text(u.name ?? "Пользователь").font(.title2).fontWeight(.bold)
-            RatingView(value: u.ratingAvg, count: u.ratingCount)
+            // Рейтинга у новичка нет — вместо нуля честная пометка; неявки, если были.
+            HStack(spacing: 8) {
+                RatingView(value: u.ratingAvg, count: u.ratingCount, showsNewcomer: true)
+                NoShowBadge(count: u.noShows)
+            }
             if let bio = u.bio, !bio.isEmpty {
                 Text(bio).multilineTextAlignment(.center).padding(.horizontal)
             }
@@ -92,7 +101,7 @@ struct PublicProfileView: View {
                             HStack {
                                 Text(r.author.name ?? "Аноним").font(.subheadline).fontWeight(.medium)
                                 Spacer()
-                                RatingView(value: Double(r.rating), count: 0)
+                                ReviewVerdict(rating: r.rating, attended: r.didAttend)
                             }
                             if let c = r.comment, !c.isEmpty {
                                 Text(c).font(.footnote).foregroundStyle(.secondary)
@@ -113,6 +122,20 @@ struct PublicProfileView: View {
 
             if u.id != auth.me?.id {
                 VStack(spacing: 10) {
+                    // Личная переписка открывается фактом встречи, а не кнопкой:
+                    // без общего завершённого события её тут просто нет.
+                    if haveMet && !isBlocked {
+                        Button { Task { await openDirectChat(with: u) } } label: {
+                            Label(openingChat ? "Открываем…" : "Написать лично",
+                                  systemImage: "bubble.left.fill")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                                .background(Theme.accent)
+                                .foregroundStyle(.white)
+                                .clipShape(Capsule())
+                        }
+                        .disabled(openingChat)
+                    }
                     Button { Task { await toggleFollow() } } label: {
                         Label(isFollowing ? "Вы подписаны" : "Подписаться на автора",
                               systemImage: isFollowing ? "bell.fill" : "bell")
@@ -168,10 +191,23 @@ struct PublicProfileView: View {
             reviews = resp.items
         }
         if userID != auth.me?.id,
-           let st: FollowStatus = try? await auth.api.send(
+           let st: FollowStatusResponse = try? await auth.api.send(
                Endpoint(path: "/users/\(userID)/follow-status")) {
             isFollowing = st.following
+            haveMet = st.haveMet
         }
+    }
+
+    private func openDirectChat(with u: UserPublic) async {
+        actionError = nil
+        openingChat = true
+        defer { openingChat = false }
+        do {
+            let resp: DirectChatResponse = try await auth.api.send(Endpoint(
+                path: "/connections/\(userID)/chat", method: .post))
+            directChatID = resp.conversationID
+        } catch let err as APIError { actionError = err.message }
+        catch { actionError = "Не удалось открыть переписку." }
     }
 
     private func toggleFollow() async {

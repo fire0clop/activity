@@ -21,7 +21,7 @@ from app.schemas.conversation import (
 )
 from app.schemas.message import MessagesOut
 from app.schemas.user import UserPublic
-from app.services import chat_service
+from app.services import chat_service, connection_service
 from app.services.pagination import decode_cursor, encode_cursor
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -68,11 +68,20 @@ async def _build_list_item(
     _, last = await _last_message(db, conv.id)
     if members_count is None:
         members_count = await chat_service.members_count(db, conv.id)
+
+    title, avatar = conv.title, await _avatar_url(db, conv)
+    if conv.type == "direct":
+        # Личная беседа называется именем собеседника — своего названия у неё нет.
+        peers = await connection_service.direct_peer_ids(db, [conv.id], member.user_id)
+        peer = await db.get(User, peers[conv.id]) if conv.id in peers else None
+        title = (peer.name if peer else None) or "Личная переписка"
+        avatar = peer.avatar_url if peer else None
+
     return ConversationListItem(
         id=conv.id,
         type=conv.type,
-        title=conv.title,
-        avatar_url=await _avatar_url(db, conv),
+        title=title,
+        avatar_url=avatar,
         event_id=conv.event_id,
         members_count=members_count,
         last_message=last,
@@ -123,6 +132,7 @@ async def list_conversations(
     unread_by_conv: dict[uuid.UUID, int] = {}
     cover_by_event: dict[uuid.UUID, str | None] = {}
     sender_names: dict[uuid.UUID, str | None] = {}
+    peer_by_conv: dict[uuid.UUID, User] = {}
     if conv_ids:
         conv_rows = (
             await db.execute(select(Conversation).where(Conversation.id.in_(conv_ids)))
@@ -164,6 +174,18 @@ async def list_conversations(
                 await db.execute(select(Event).where(Event.id.in_(event_ids)))
             ).scalars().all()
             cover_by_event = {e.id: e.cover_url for e in events}
+
+        # У личных бесед нет своего названия — берём имя и фото собеседника.
+        direct_ids = [c.id for c in conv_rows if c.type == "direct"]
+        if direct_ids:
+            peers = await connection_service.direct_peer_ids(db, direct_ids, current_user.id)
+            peer_users = (
+                await db.execute(select(User).where(User.id.in_(set(peers.values()))))
+            ).scalars().all()
+            by_id = {u.id: u for u in peer_users}
+            peer_by_conv = {
+                conv_id: by_id[uid] for conv_id, uid in peers.items() if uid in by_id
+            }
 
         # Непрочитанные для ТЕКУЩЕГО пользователя по всем беседам — одним join-запросом.
         lr = aliased(Message)
@@ -208,11 +230,16 @@ async def list_conversations(
             else None
         )
         avatar = cover_by_event.get(conv.event_id) if conv.type == "event" and conv.event_id else None
+        title = conv.title
+        if conv.type == "direct":
+            peer = peer_by_conv.get(conv.id)
+            title = (peer.name if peer else None) or "Личная переписка"
+            avatar = peer.avatar_url if peer else None
         items.append(
             ConversationListItem(
                 id=conv.id,
                 type=conv.type,
-                title=conv.title,
+                title=title,
                 avatar_url=avatar,
                 event_id=conv.event_id,
                 members_count=counts_by_conv.get(conv.id, 0),
