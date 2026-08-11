@@ -7,11 +7,13 @@ from sqlalchemy import String, cast, func, or_, select, tuple_
 
 from app.core.config import settings
 from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
-from app.core.exceptions import forbidden, not_found
+from app.core.exceptions import conflict, forbidden, not_found
 from app.models.conversation import Conversation
 from app.models.event import Event
 from app.models.participation import Participation
+from app.models.request import CompanyRequest
 from app.models.user import User
+from app.schemas.connection import InviteIn, InviteOut
 from app.schemas.event import (
     EventCreateIn,
     EventDetail,
@@ -20,7 +22,14 @@ from app.schemas.event import (
     PhotosOut,
 )
 from app.schemas.user import UserBrief
-from app.services import event_service, matching_service
+from app.services import (
+    chat_service,
+    connection_service,
+    event_service,
+    matching_service,
+    push_service,
+    request_service,
+)
 from app.services.pagination import decode_keyset, encode_keyset
 from app.services.rate_limit import check_user_action
 from app.services.storage_service import get_storage
@@ -46,10 +55,7 @@ async def _accepted_briefs(db: DbSession, event_id: uuid.UUID, limit: int = 12) 
             .limit(limit)
         )
     ).scalars().all()
-    return [
-        UserBrief(id=u.id, name=u.name, avatar_url=u.avatar_url, rating_avg=float(u.rating_avg))
-        for u in rows
-    ]
+    return [UserBrief.from_model(u) for u in rows]
 
 
 def _when_range(when: str) -> tuple[datetime, datetime]:
@@ -138,6 +144,12 @@ async def create_event(
     except Exception:  # noqa: BLE001
         import logging
         logging.getLogger("subscriptions").exception("notify failed for event %s", event.id)
+
+    # Событие собрано по чужому «хочу» — закрываем запрос и зовём тех, кто его ждал.
+    if body.from_request_id is not None:
+        req = await db.get(CompanyRequest, body.from_request_id)
+        if req is not None and req.status == "open":
+            await request_service.fulfill(db, req, event)
 
     return event_service.build_detail(
         event, current_user, viewer_id=current_user.id, my_status="accepted",
@@ -334,6 +346,12 @@ async def update_event(
     if event.organizer_id != current_user.id:
         raise forbidden("Только организатор может изменять событие")
 
+    # Запоминаем договорённость до правки: если поменялись время или место, участников
+    # надо предупредить — они на это событие уже рассчитывают.
+    was_starts_at = event.starts_at
+    was_address = event.address
+    was_point = (event.latitude, event.longitude)
+
     data = body.model_dump(exclude_unset=True)
     # Если меняют ссылку на точку — пересчитываем координаты.
     if data.get("map_url"):
@@ -353,10 +371,40 @@ async def update_event(
 
     count = await matching_service.accepted_count(db, event.id)
     conv = await _conversation_id(db, event.id)
+    await _announce_changes(db, event, was_starts_at, was_address, was_point, conv)
     return event_service.build_detail(
         event, current_user, viewer_id=current_user.id, my_status="accepted",
         participants_current=count, distance_km=None, conversation_id=conv,
     )
+
+
+async def _announce_changes(
+    db: DbSession,
+    event: Event,
+    was_starts_at: datetime,
+    was_address: str | None,
+    was_point: tuple[float, float],
+    conversation_id: uuid.UUID | None,
+) -> None:
+    """Сообщить участникам о переносе времени или смене места — пушем и в чат события."""
+    changes: list[str] = []
+    if event.starts_at != was_starts_at:
+        changes.append(f"новое время: {event.starts_at.strftime('%d.%m в %H:%M')} (UTC)")
+    if event.address != was_address or (event.latitude, event.longitude) != was_point:
+        changes.append(f"новое место: {event.address or 'смотрите точку на карте'}")
+    if not changes:
+        return
+
+    summary = " · ".join(changes)
+    await matching_service.notify_participants(
+        db, event, "Событие изменилось", f"«{event.title}» — {summary}",
+        exclude_user_id=event.organizer_id,
+    )
+    if conversation_id is not None:
+        await chat_service.post_message(
+            db, conversation_id, f"Организатор изменил событие. {summary}",
+            sender_id=None, is_system=True,
+        )
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -366,12 +414,27 @@ async def delete_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSes
         raise not_found("Событие не найдено")
     if event.organizer_id != current_user.id:
         raise forbidden("Только организатор может отменить событие")
+    if event.status == "cancelled":
+        return  # повторная отмена не должна слать второй пуш
     event.status = "cancelled"
     conv = await db.execute(select(Conversation).where(Conversation.event_id == event.id))
     c = conv.scalar_one_or_none()
     if c is not None:
         c.is_archived = True
     await db.commit()
+
+    # Люди уже спланировали на это время — молча гасить событие нельзя.
+    when = event.starts_at.strftime("%d.%m в %H:%M")
+    if c is not None:
+        await chat_service.post_message(
+            db, c.id, f"Событие отменено организатором. Встреча {when} (UTC) не состоится.",
+            sender_id=None, is_system=True,
+        )
+    await matching_service.notify_participants(
+        db, event, "Событие отменено",
+        f"«{event.title}» {when} (UTC) отменено организатором",
+        exclude_user_id=event.organizer_id,
+    )
 
 
 @router.post("/{event_id}/finish", response_model=EventDetail)
@@ -400,6 +463,71 @@ async def finish_event(event_id: uuid.UUID, current_user: CurrentUser, db: DbSes
         event, current_user, viewer_id=current_user.id, my_status="accepted",
         participants_current=count, distance_km=None, conversation_id=c.id if c else None,
     )
+
+
+@router.post("/{event_id}/invite", response_model=InviteOut)
+async def invite_connections(
+    event_id: uuid.UUID, body: InviteIn, current_user: CompleteUser, db: DbSession
+) -> InviteOut:
+    """Позвать знакомых в своё событие.
+
+    Звать можно только тех, с кем уже была совместная встреча. Приглашённый НЕ попадает
+    в состав молча: ему заводится заявка со статусом «invited» и приходит пуш, а место
+    он занимает сам, нажав «Иду». Тихое добавление людей в чужую встречу и в её чат —
+    ровно тот сценарий, из-за которого потом спрашивают «а что это за группа».
+    """
+    event = await db.get(Event, event_id)
+    if event is None:
+        raise not_found("Событие не найдено")
+    if event.organizer_id != current_user.id:
+        raise forbidden("Звать в событие может только организатор")
+    if event.status in ("cancelled", "finished"):
+        raise conflict("event_closed", "Событие уже закрыто")
+
+    known = await connection_service.met_user_ids(db, current_user.id)
+    targets = {uid for uid in body.user_ids if uid in known and uid != current_user.id}
+    skipped = len(set(body.user_ids)) - len(targets)
+    if not targets:
+        return InviteOut(invited=0, skipped=skipped)
+
+    # Тех, у кого уже есть живая заявка, не трогаем — повторное приглашение им не нужно.
+    busy = set(
+        (
+            await db.execute(
+                select(Participation.user_id).where(
+                    Participation.event_id == event_id,
+                    Participation.user_id.in_(targets),
+                    Participation.status.in_(("pending", "accepted", "waitlisted", "invited")),
+                )
+            )
+        ).scalars().all()
+    )
+    fresh = targets - busy
+    skipped += len(busy)
+
+    for uid in fresh:
+        existing = (
+            await db.execute(
+                select(Participation).where(
+                    Participation.event_id == event_id, Participation.user_id == uid
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is not None:  # был отказ или отмена — переиспользуем строку
+            existing.status = "invited"
+            existing.decided_at = None
+        else:
+            db.add(Participation(event_id=event_id, user_id=uid, status="invited"))
+    await db.commit()
+
+    when = event.starts_at.strftime("%d.%m в %H:%M")
+    for uid in fresh:
+        await push_service.send_push(
+            db, uid, "Вас зовут",
+            f"{current_user.name} зовёт вас на «{event.title}» {when} (UTC)",
+            {"event_id": str(event_id)},
+        )
+    return InviteOut(invited=len(fresh), skipped=skipped)
 
 
 @router.post("/{event_id}/cover")

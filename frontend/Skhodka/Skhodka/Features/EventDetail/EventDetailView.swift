@@ -14,6 +14,8 @@ struct EventDetailView: View {
     @State private var reportStatus: String?
     @State private var photoPage = 0
     @State private var fullScreen = false
+    @State private var showInvite = false
+    @State private var inviteResult: String?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -34,6 +36,14 @@ struct EventDetailView: View {
         }
         .fullScreenCover(isPresented: $fullScreen) {
             FullScreenPhotoView(images: event?.images ?? [], start: photoPage)
+        }
+        .sheet(isPresented: $showInvite) {
+            InviteConnectionsView(eventID: eventID) { invited in
+                inviteResult = invited > 0
+                    ? "Позвали: \(invited). Придут, если подтвердят."
+                    : "Никого не позвали."
+                Task { await load() }
+            }
         }
         .task { await load() }
         .confirmationDialog("Пожаловаться на событие", isPresented: $showReport, titleVisibility: .visible) {
@@ -64,6 +74,19 @@ struct EventDetailView: View {
                 if e.status == "finished", e.isOrganizer || e.myParticipation?.status == "accepted" {
                     NavigationLink { ReviewView(event: e) } label: {
                         Label("Оставить отзывы", systemImage: "star.bubble").font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Theme.accentInk)
+                    }
+                }
+                // Позвать тех, кого в приложении ещё нет: ссылка открывает эту же
+                // карточку, а без приложения ведёт в App Store.
+                if e.status != "cancelled" {
+                    ShareLink(
+                        item: AppConfig.shareURL(eventID: e.id),
+                        subject: Text(e.title),
+                        message: Text("Собираемся: «\(e.title)». Присоединяйся")
+                    ) {
+                        Label("Поделиться ссылкой", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Theme.accentInk)
                     }
                 }
@@ -164,15 +187,24 @@ struct EventDetailView: View {
         }
     }
 
+    @ViewBuilder
     private func factsRow(_ e: EventDetail) -> some View {
-        let hasPrice = (e.price ?? 0) > 0
-        let priceValue = hasPrice ? "\(Int(e.price!)) ₽" : "Free"
-        let priceLabel = hasPrice ? (e.priceSplit == "shared" ? "на всех" : "с человека") : "бесплатно"
-        // Единый компонент метрик — тот же, что в статистике профиля.
-        return MetricsRow(items: [
-            .init(value: "\(e.participantsCurrent)/\(e.participantsMax.map(String.init) ?? "∞")", label: "участники"),
-            .init(value: priceValue, label: priceLabel),
-        ])
+        let price = Pricing.detail(price: e.price, split: e.priceSplit,
+                                   current: e.participantsCurrent, max: e.participantsMax)
+        VStack(spacing: 8) {
+            // Единый компонент метрик — тот же, что в статистике профиля.
+            MetricsRow(items: [
+                .init(value: "\(e.participantsCurrent)/\(e.participantsMax.map(String.init) ?? "∞")",
+                      label: "участники"),
+                .init(value: price.value, label: price.caption),
+            ])
+            // Общий счёт: цена меняется по мере набора — объясняем это прямо, а не мелким шрифтом.
+            if PriceSplit(raw: e.priceSplit) == .shared, let total = e.price, total > 0 {
+                Text("Общий счёт \(Pricing.amount(total)) делится на пришедших — чем больше людей, тем дешевле каждому.")
+                    .font(.footnote).foregroundStyle(Theme.ink2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 
     private func goingBlock(_ e: EventDetail) -> some View {
@@ -182,7 +214,9 @@ struct EventDetailView: View {
                 AvatarStack(urls: e.acceptedParticipants.map { $0.avatarURL },
                             names: e.acceptedParticipants.map { $0.name }, size: 38)
                 Spacer()
-                NavigationLink { ParticipantsView(eventID: e.id) } label: {
+                NavigationLink {
+                    ParticipantsView(eventID: e.id, isOrganizer: e.isOrganizer)
+                } label: {
                     Text("Все").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accentInk)
                 }
             }
@@ -198,7 +232,9 @@ struct EventDetailView: View {
                     Text(e.organizer.name ?? "—").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.ink)
                 }
                 Spacer()
-                RatingView(value: e.organizer.ratingAvg, count: 0)
+                // В карточке новичок помечен явно: это часть решения «идти или нет».
+                RatingView(value: e.organizer.ratingAvg, count: e.organizer.reviewsCount,
+                           showsNewcomer: true)
                 Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.ink2)
             }
             .padding(14).cardStyle()
@@ -211,11 +247,39 @@ struct EventDetailView: View {
     private func stickyBar(_ e: EventDetail) -> some View {
         VStack(spacing: 0) {
             Divider().background(Theme.line)
+            if let inviteResult {
+                Text(inviteResult).font(.footnote).foregroundStyle(Theme.ink2)
+                    .padding(.top, 8).padding(.horizontal, 20)
+            }
             Group {
                 if e.isOrganizer {
-                    NavigationLink { ParticipantsView(eventID: e.id) } label: { ctaLabel("Управлять участниками", filled: true) }
+                    HStack(spacing: 10) {
+                        NavigationLink {
+                            ParticipantsView(eventID: e.id, isOrganizer: true)
+                        } label: { ctaLabel("Участники", filled: true) }
+                        // Позвать знакомых — самый быстрый способ собрать состав,
+                        // когда движуха новая и в ленте её ещё никто не увидел.
+                        Button { showInvite = true } label: {
+                            ctaLabel("Позвать своих", filled: false)
+                        }
+                        .disabled(e.status == "cancelled" || e.status == "finished")
+                    }
                 } else {
                     switch ParticipationStatus(raw: e.myParticipation?.status) {
+                    case .invited:
+                        // Организатор уже сказал «да» — остаётся согласиться.
+                        VStack(spacing: 6) {
+                            Text("Вас позвали на эту движуху")
+                                .font(.system(size: 13)).foregroundStyle(Theme.ink2)
+                            HStack(spacing: 10) {
+                                Button { Task { await join() } } label: {
+                                    ctaLabel(actionLoading ? "…" : "Иду", filled: true)
+                                }
+                                Button { Task { await leave() } } label: {
+                                    ctaLabel("Не смогу", filled: false)
+                                }
+                            }
+                        }
                     case .accepted:
                         if let cid = e.conversationID {
                             NavigationLink {
@@ -278,6 +342,16 @@ struct EventDetailView: View {
             Haptics.success()
             await load()
         } catch let err as APIError { errorText = err.message } catch { errorText = "Не удалось откликнуться" }
+    }
+
+    /// Отказаться от приглашения или выйти из состава.
+    private func leave() async {
+        actionLoading = true; errorText = nil; defer { actionLoading = false }
+        do {
+            try await auth.api.sendVoid(Endpoint(path: "/events/\(eventID)/join", method: .delete))
+            await load()
+        } catch let err as APIError { errorText = err.message }
+        catch { errorText = "Не удалось отменить участие" }
     }
 }
 
