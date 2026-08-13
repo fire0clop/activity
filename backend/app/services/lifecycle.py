@@ -8,7 +8,7 @@ from app.db.session import SessionLocal
 from app.models.conversation import Conversation
 from app.models.event import Event
 from app.models.participation import Participation
-from app.services import matching_service
+from app.services import matching_service, request_service
 
 logger = logging.getLogger("lifecycle")
 
@@ -100,6 +100,14 @@ async def _send_reminders_once() -> int:
     return sent_total
 
 
+async def _expire_requests_once() -> int:
+    """Протухшие «хочу» убираем из ленты запросов — иначе она станет кладбищем."""
+    async with SessionLocal() as db:
+        n = await request_service.expire_stale(db)
+        await db.commit()
+        return n
+
+
 async def run_sweeper() -> None:
     """Фоновая задача: авто-финиш прошедших событий, архивация чатов, напоминания участникам."""
     while True:
@@ -110,6 +118,9 @@ async def run_sweeper() -> None:
             r = await _send_reminders_once()
             if r:
                 logger.info("lifecycle: sent %d reminders", r)
+            e = await _expire_requests_once()
+            if e:
+                logger.info("lifecycle: expired %d company requests", e)
         except asyncio.CancelledError:
             break
         except Exception:  # noqa: BLE001
