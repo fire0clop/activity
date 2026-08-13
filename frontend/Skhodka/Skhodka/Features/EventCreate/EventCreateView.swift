@@ -3,6 +3,16 @@ import PhotosUI
 import SwiftUI
 
 struct EventCreateView: View {
+    /// Заготовка формы, когда событие собирают по чужому «хочу».
+    struct Prefill {
+        var category: String?
+        var coordinate: CLLocationCoordinate2D?
+        var address: String?
+        var fromRequestID: String?
+    }
+
+    var prefill: Prefill?
+
     @EnvironmentObject var auth: AuthManager
     @Environment(\.dismiss) private var dismiss
 
@@ -17,6 +27,7 @@ struct EventCreateView: View {
     @State private var unlimited = false
     @State private var maxParticipants = 4
     @State private var price = ""
+    @State private var priceSplit: PriceSplit = .free
     @State private var autoAccept = false
     @State private var repeatWeekly = false
     @State private var photoItems: [PhotosPickerItem] = []
@@ -28,7 +39,17 @@ struct EventCreateView: View {
         picked != nil || !mapURL.trimmingCharacters(in: .whitespaces).isEmpty
     }
     private var canSubmit: Bool {
-        title.trimmingCharacters(in: .whitespaces).count >= 3 && hasLocation
+        let priceOK = priceSplit == .free || (Double(price) ?? 0) > 0
+        return title.trimmingCharacters(in: .whitespaces).count >= 3 && hasLocation && priceOK
+    }
+
+    /// Для общего счёта сразу показываем, во что это выльется каждому: сумма выкупа
+    /// сама по себе ничего не говорит, пока не поделена на людей.
+    private var sharedEstimate: String? {
+        guard priceSplit == .shared, let total = Double(price), total > 0 else { return nil }
+        let heads = unlimited ? 4 : maxParticipants
+        return "При \(heads) участниках — примерно \(Pricing.amount(total / Double(heads))) с человека"
+            + (unlimited ? " (без ограничения считаем по четверым)" : "")
     }
 
     var body: some View {
@@ -78,8 +99,22 @@ struct EventCreateView: View {
                     Toggle("Авто-приём первых", isOn: $autoAccept)
                     FormDivider()
                     Toggle("Повторять еженедельно", isOn: $repeatWeekly)
-                    FormDivider()
-                    TextField("Стоимость, ₽ (опционально)", text: $price).keyboardType(.numberPad)
+                }
+                FormSection(title: "Деньги") {
+                    Picker("Оплата", selection: $priceSplit) {
+                        ForEach(PriceSplit.allCases) { s in Text(s.title).tag(s) }
+                    }
+                    .pickerStyle(.segmented)
+                    Text(priceSplit.hint).font(.footnote).foregroundStyle(Theme.ink2)
+                    if priceSplit != .free {
+                        FormDivider()
+                        TextField(priceSplit == .shared ? "Вся сумма, ₽" : "Сумма с человека, ₽",
+                                  text: $price)
+                            .keyboardType(.numberPad)
+                        if let estimate = sharedEstimate {
+                            Text(estimate).font(.footnote).foregroundStyle(Theme.accentInk)
+                        }
+                    }
                 }
                 FormSection(title: "Фото (до 5)") {
                     PhotosPicker(selection: $photoItems, maxSelectionCount: 5, matching: .images) {
@@ -120,9 +155,11 @@ struct EventCreateView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("Новое событие").font(.serifTitle(18, weight: .bold)).foregroundStyle(Theme.ink)
+                Text(prefill?.fromRequestID == nil ? "Новое событие" : "Собираем по запросу")
+                    .font(.serifTitle(18, weight: .bold)).foregroundStyle(Theme.ink)
             }
         }
+        .onAppear(perform: applyPrefill)
         .onChange(of: photoItems) { _, items in
             Task { await loadPhotos(items) }
         }
@@ -132,6 +169,15 @@ struct EventCreateView: View {
                 mapURL = ""
             }
         }
+    }
+
+    /// Форма, открытая из чужого «хочу», приходит уже наполовину заполненной —
+    /// организатору остаётся назначить время и уточнить место.
+    private func applyPrefill() {
+        guard let prefill, title.isEmpty else { return }
+        if let c = prefill.category, category.isEmpty { category = c }
+        if let coord = prefill.coordinate, picked == nil { picked = coord }
+        if let a = prefill.address, address.isEmpty { address = a }
     }
 
     private func categoryChip(_ key: String) -> some View {
@@ -181,10 +227,11 @@ struct EventCreateView: View {
             address: address.isEmpty ? nil : address,
             min_participants: 2,
             max_participants: unlimited ? nil : maxParticipants,
-            price: Double(price),
-            price_split: price.isEmpty ? "free" : "shared",
+            price: priceSplit == .free ? nil : Double(price),
+            price_split: priceSplit.rawValue,
             auto_accept: autoAccept,
-            recurrence: repeatWeekly ? "weekly" : "none"
+            recurrence: repeatWeekly ? "weekly" : "none",
+            from_request_id: prefill?.fromRequestID
         )
         do {
             let created: EventDetail = try await auth.api.send(Endpoint(

@@ -11,6 +11,7 @@ struct FeedView: View {
     @State private var camera: MapCameraPosition = .automatic
     @State private var showCityPicker = false
     @State private var showSubscriptions = false
+    @State private var showRequests = false
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -22,6 +23,13 @@ struct FeedView: View {
             }
             .navigationBarHidden(true)
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
+            .navigationDestination(isPresented: $showRequests) {
+                RequestsView(
+                    coordinate: CLLocationCoordinate2D(latitude: vm.latitude,
+                                                       longitude: vm.longitude),
+                    areaHint: vm.manualCity?.name
+                )
+            }
             .task {
                 vm.configure(auth.api)
                 location.request()
@@ -96,6 +104,8 @@ struct FeedView: View {
             }
             Spacer()
             HStack(spacing: 8) {
+                circleButton("hand.raised") { showRequests = true }
+                    .accessibilityLabel("Кто ищет компанию")
                 circleButton("bell") { showSubscriptions = true }
                     .accessibilityLabel("Подписки на события")
                 circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
@@ -260,6 +270,15 @@ struct FeedView: View {
                 Text("Создать событие").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
                     .padding(.horizontal, 22).padding(.vertical, 13).background(Theme.accent).clipShape(Capsule())
             }
+
+            // Организовать готовы единицы, а сказать «хочу» — многие. В пустом городе
+            // это единственный дешёвый способ показать, что тут вообще кто-то живой.
+            Button { showRequests = true } label: {
+                Text("Или скажите, чего хотите")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.accentInk)
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(Theme.accentSoft).clipShape(Capsule())
+            }
         }
         .frame(maxWidth: .infinity).padding(.top, 50)
     }
@@ -295,12 +314,16 @@ private struct FeatureEventCard: View {
                     HStack(spacing: 14) {
                         meta("location.fill", item.distanceKm.map { String(format: "%.1f км", $0) } ?? "—")
                         meta("person.2.fill", "\(item.participantsCurrent)/\(item.participantsMax.map(String.init) ?? "∞")")
-                        if let p = item.price, p > 0 { meta("rublesign", "\(Int(p))") }
-                        Spacer()
-                        // Рейтинг организатора показываем только когда он есть — иначе «★ —» путает.
-                        if item.organizer.ratingAvg > 0 {
-                            RatingView(value: item.organizer.ratingAvg, count: 1)
+                        // В ленте показываем то, что человек реально заплатит:
+                        // для общего счёта это доля, а не вся сумма выкупа.
+                        if let p = item.price, p > 0 {
+                            meta("rublesign", Pricing.short(price: p, split: item.priceSplit,
+                                                            current: item.participantsCurrent)
+                                .replacingOccurrences(of: " ₽", with: ""))
                         }
+                        Spacer()
+                        // Пусто, пока об организаторе нет отзывов: в ленте «Новичок» — лишний шум.
+                        RatingView(value: item.organizer.ratingAvg, count: item.organizer.reviewsCount)
                     }
                 }.padding(14)
             }
