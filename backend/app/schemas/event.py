@@ -24,6 +24,8 @@ class EventCreateIn(BaseModel):
     price_split: str = Field(default="free", pattern="^(free|per_person|shared)$")
     auto_accept: bool = False
     recurrence: str = Field(default="none", pattern="^(none|weekly)$")
+    # Событие собрано по чужому «хочу»: закрываем запрос и зовём тех, кто его ждал.
+    from_request_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _check(self) -> "EventCreateIn":
@@ -34,7 +36,23 @@ class EventCreateIn(BaseModel):
         has_coords = self.latitude is not None and self.longitude is not None
         if not has_coords and not self.map_url:
             raise ValueError("provide latitude+longitude or map_url")
+        check_price(self.price_split, self.price)
         return self
+
+
+def check_price(split: str | None, price: float | None) -> None:
+    """Сумма и способ оплаты обязаны сходиться.
+
+    «Бесплатно» с ценой и «с каждого» без цены — обещания, которые нечем выполнить:
+    участник увидит одно, а на месте окажется другое.
+    """
+    if split is None:
+        return
+    if split == "free":
+        if price:
+            raise ValueError("для бесплатного события цена не указывается")
+    elif not price or price <= 0:
+        raise ValueError("укажите сумму — она нужна для выбранного способа оплаты")
 
 
 class EventUpdateIn(BaseModel):
@@ -50,6 +68,14 @@ class EventUpdateIn(BaseModel):
     price: float | None = None
     price_split: str | None = Field(default=None, pattern="^(free|per_person|shared)$")
     auto_accept: bool | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "EventUpdateIn":
+        # Проверяем только когда способ оплаты меняют: частичное обновление не обязано
+        # присылать оба поля разом.
+        if self.price_split is not None:
+            check_price(self.price_split, self.price)
+        return self
 
 
 class MyParticipation(BaseModel):

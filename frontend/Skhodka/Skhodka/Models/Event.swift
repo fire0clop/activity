@@ -4,11 +4,18 @@ struct OrganizerBrief: Decodable, Hashable, Identifiable {
     let id: String
     let name: String?
     let avatarURL: String?
-    let ratingAvg: Double
+    /// null, пока об организаторе никто не написал отзыв.
+    let ratingAvg: Double?
+    let ratingCount: Int?
+
+    /// Число отзывов; поле молодое — старый ответ сервера читаем как 0.
+    var reviewsCount: Int { ratingCount ?? 0 }
+
     private enum CodingKeys: String, CodingKey {
         case id, name
         case avatarURL = "avatar_url"
         case ratingAvg = "rating_avg"
+        case ratingCount = "rating_count"
     }
 }
 
@@ -155,6 +162,92 @@ struct UpdateEventBody: Encodable {
 
 
 /// Тело POST /events. Координаты задаются ссылкой Яндекс.Карт (map_url) либо напрямую.
+/// Как участники платят. Три случая покрывают почти всё, что бывает офлайн.
+enum PriceSplit: String, CaseIterable, Identifiable {
+    /// Ничего платить не нужно.
+    case free
+    /// Каждый платит за себя, общей суммы нет: гидроциклы, билеты, свой обед.
+    case perPerson = "per_person"
+    /// Есть общий счёт, который делится на пришедших: выкуп зала, аренда дома, катер.
+    case shared
+
+    var id: String { rawValue }
+
+    init(raw: String?) {
+        self = raw.flatMap { PriceSplit(rawValue: $0) } ?? .free
+    }
+
+    var title: String {
+        switch self {
+        case .free: "Бесплатно"
+        case .perPerson: "С каждого"
+        case .shared: "Общий счёт"
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .free: "Участие ничего не стоит."
+        case .perPerson: "Каждый платит сам за себя — общей суммы, которую нужно собрать, нет."
+        case .shared: "Одна сумма на всех: она делится на тех, кто придёт. Чем больше людей, тем дешевле каждому."
+        }
+    }
+}
+
+/// Как показать цену в ленте и в карточке.
+///
+/// Главное здесь — общий счёт: сумма делится на реальное число участников, поэтому
+/// «с человека» меняется по мере набора. Показываем обе цифры, чтобы на встрече не
+/// выяснялось, кто сколько должен.
+enum Pricing {
+    static func amount(_ value: Double) -> String {
+        let n = NSNumber(value: value.rounded())
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.groupingSeparator = " "
+        f.maximumFractionDigits = 0
+        return (f.string(from: n) ?? "\(Int(value))") + " ₽"
+    }
+
+    /// Короткая подпись для карточки в ленте.
+    static func short(price: Double?, split: String?, current: Int) -> String {
+        let split = PriceSplit(raw: split)
+        guard let price, price > 0, split != .free else { return "бесплатно" }
+        switch split {
+        case .free: return "бесплатно"
+        case .perPerson: return amount(price)
+        case .shared: return amount(perHead(price: price, current: current))
+        }
+    }
+
+    /// Сколько выходит с человека прямо сейчас (для общего счёта).
+    static func perHead(price: Double, current: Int) -> Double {
+        price / Double(max(current, 1))
+    }
+
+    /// Крупное значение и подпись под ним для блока фактов.
+    static func detail(price: Double?, split: String?, current: Int,
+                       max maxCount: Int?) -> (value: String, caption: String) {
+        let split = PriceSplit(raw: split)
+        guard let price, price > 0, split != .free else {
+            return ("Free", "бесплатно")
+        }
+        switch split {
+        case .free:
+            return ("Free", "бесплатно")
+        case .perPerson:
+            return (amount(price), "с человека")
+        case .shared:
+            let now = amount(perHead(price: price, current: current))
+            if let maxCount, maxCount > current {
+                let best = amount(perHead(price: price, current: maxCount))
+                return (now, "с человека сейчас · \(best) при полном составе")
+            }
+            return (now, "с человека · \(amount(price)) на всех")
+        }
+    }
+}
+
 struct CreateEventBody: Encodable {
     let title: String
     let description: String?
@@ -171,4 +264,6 @@ struct CreateEventBody: Encodable {
     let price_split: String
     let auto_accept: Bool
     var recurrence: String = "none"   // none | weekly
+    /// Событие собрано по чужому «хочу»: сервер закроет запрос и позовёт тех, кто его ждал.
+    var from_request_id: String? = nil
 }
