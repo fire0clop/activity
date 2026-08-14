@@ -113,3 +113,43 @@ async def test_finish_enables_reviews(client, user_factory) -> None:
     pub = (await client.get(f"/users/{guest['id']}", headers=org["headers"])).json()
     assert pub["rating_avg"] == 5.0
     assert pub["rating_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_price_and_split_must_agree(client, user_factory) -> None:
+    """Обещание про деньги должно быть выполнимым: способ оплаты и сумма обязаны сходиться."""
+    org = await user_factory("Орг")
+
+    # общий счёт без суммы — делить нечего
+    bad = await client.post("/events", headers=org["headers"],
+                            json=_event_body(price_split="shared", price=None))
+    assert bad.status_code == 422
+
+    # «с каждого» без суммы — тоже
+    bad2 = await client.post("/events", headers=org["headers"],
+                             json=_event_body(price_split="per_person", price=None))
+    assert bad2.status_code == 422
+
+    # бесплатно, но с ценой — противоречие
+    bad3 = await client.post("/events", headers=org["headers"],
+                             json=_event_body(price_split="free", price=500))
+    assert bad3.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_three_payment_modes_are_stored(client, user_factory) -> None:
+    org = await user_factory("Орг")
+
+    free = (await client.post("/events", headers=org["headers"],
+                              json=_event_body(price_split="free", price=None))).json()
+    assert free["price_split"] == "free"
+
+    # гидроциклы: каждый берёт свой, общей суммы нет
+    each = (await client.post("/events", headers=org["headers"],
+                              json=_event_body(price_split="per_person", price=3000))).json()
+    assert (each["price_split"], each["price"]) == ("per_person", 3000.0)
+
+    # выкуп ресторана: одна сумма на всех
+    shared = (await client.post("/events", headers=org["headers"],
+                                json=_event_body(price_split="shared", price=100000))).json()
+    assert (shared["price_split"], shared["price"]) == ("shared", 100000.0)

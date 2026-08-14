@@ -14,6 +14,7 @@ struct EventEditView: View {
     @State private var unlimited: Bool
     @State private var maxParticipants: Int
     @State private var price: String
+    @State private var priceSplit: PriceSplit
     @State private var autoAccept: Bool
     @State private var newMapURL = ""
     @State private var photos: [String]
@@ -32,6 +33,7 @@ struct EventEditView: View {
         _unlimited = State(initialValue: event.participantsMax == nil)
         _maxParticipants = State(initialValue: event.participantsMax ?? 4)
         _price = State(initialValue: event.price.map { String(Int($0)) } ?? "")
+        _priceSplit = State(initialValue: PriceSplit(raw: event.priceSplit))
         _autoAccept = State(initialValue: event.autoAccept)
         _photos = State(initialValue: event.photoURLs)
     }
@@ -59,8 +61,19 @@ struct EventEditView: View {
                         }
                         FormDivider()
                         Toggle("Авто-приём первых", isOn: $autoAccept)
-                        FormDivider()
-                        TextField("Стоимость, ₽", text: $price).keyboardType(.numberPad)
+                    }
+                    FormSection(title: "Деньги") {
+                        Picker("Оплата", selection: $priceSplit) {
+                            ForEach(PriceSplit.allCases) { s in Text(s.title).tag(s) }
+                        }
+                        .pickerStyle(.segmented)
+                        Text(priceSplit.hint).font(.footnote).foregroundStyle(Theme.ink2)
+                        if priceSplit != .free {
+                            FormDivider()
+                            TextField(priceSplit == .shared ? "Вся сумма, ₽" : "Сумма с человека, ₽",
+                                      text: $price)
+                                .keyboardType(.numberPad)
+                        }
                     }
                     FormSection(title: "Фото") {
                         if !photos.isEmpty {
@@ -136,8 +149,8 @@ struct EventEditView: View {
             map_url: trimmedLink.isEmpty ? nil : trimmedLink,
             address: nil,
             max_participants: unlimited ? nil : maxParticipants,
-            price: Double(price),
-            price_split: price.isEmpty ? "free" : "shared",
+            price: priceSplit == .free ? nil : Double(price),
+            price_split: priceSplit.rawValue,
             auto_accept: autoAccept
         )
         do {
