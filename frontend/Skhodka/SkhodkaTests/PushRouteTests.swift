@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Skhodka
 
@@ -18,5 +19,23 @@ struct PushRouteTests {
     @Test("Пуш без данных не даёт маршрута")
     func noRoute() {
         #expect(PushRoute.from(userInfo: ["aps": ["alert": "hi"]]) == nil)
+    }
+}
+
+@Suite("Универсальные ссылки")
+struct UniversalLinkTests {
+    @Test("Ссылка /e/<id> ведёт на событие")
+    func eventLink() throws {
+        let url = try #require(URL(string: "https://event-serv.ru/e/3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+        #expect(PushRoute.from(url: url) == .event(id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"))
+    }
+
+    @Test("Чужие и неполные адреса игнорируются")
+    func foreignLinks() throws {
+        for bad in ["https://event-serv.ru/", "https://event-serv.ru/e/",
+                    "https://event-serv.ru/privacy", "https://event-serv.ru/e/abc/extra"] {
+            let url = try #require(URL(string: bad))
+            #expect(PushRoute.from(url: url) == nil, "не должен разбираться: \(bad)")
+        }
     }
 }
