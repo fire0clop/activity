@@ -19,6 +19,13 @@ enum PushRoute: Identifiable, Equatable {
         if let eid = userInfo["event_id"] as? String { return .event(id: eid) }
         return nil
     }
+
+    /// Из универсальной ссылки: `/e/<event_id>`. Чужие адреса игнорируем.
+    static func from(url: URL) -> PushRoute? {
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard parts.count == 2, parts[0] == "e", !parts[1].isEmpty else { return nil }
+        return .event(id: parts[1])
+    }
 }
 
 /// Связывает APNs-токен устройства с регистрацией на бэкенде (POST /devices)
@@ -57,6 +64,12 @@ final class PushCenter: ObservableObject {
     /// Вызывается из AppDelegate по нажатию на уведомление.
     func open(userInfo: [AnyHashable: Any]) {
         guard let route = PushRoute.from(userInfo: userInfo) else { return }
+        pendingRoute = route
+    }
+
+    /// Ссылка вида `https://<домен>/e/<id>` — открываем карточку события.
+    func openUniversalLink(_ url: URL) {
+        guard let route = PushRoute.from(url: url) else { return }
         pendingRoute = route
     }
 }

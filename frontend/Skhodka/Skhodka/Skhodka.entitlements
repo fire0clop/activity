@@ -8,5 +8,11 @@
     <array>
         <string>Default</string>
     </array>
+    <!-- Универсальные ссылки: iOS скачает с этого домена
+         /.well-known/apple-app-site-association и начнёт отдавать /e/<id> приложению. -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>applinks:event-serv.ru</string>
+    </array>
 </dict>
 </plist>

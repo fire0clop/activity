@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     user_rl_events_per_hour: int = 10       # создание событий
     user_rl_joins_per_hour: int = 30        # отклики на события
     user_rl_reports_per_hour: int = 10      # жалобы
+    user_rl_requests_per_hour: int = 20     # «ищу компанию» (дешевле события — лимит мягче)
     user_rl_messages_per_min: int = 60      # сообщения в чате (WS)
 
     # Storage
@@ -94,6 +95,23 @@ class Settings(BaseSettings):
     # Sign in with Apple: audience (client_id) = bundle id приложения.
     apple_client_id: str = "com.skhodka.app"
     apns_use_sandbox: bool = True  # True для dev-сборок, False для App Store / TestFlight
+
+    # Универсальные ссылки: домен, с которого раздаётся apple-app-site-association,
+    # должен совпадать с доменом ссылок вида https://<share_host>/e/<id>.
+    share_host: str = "event-serv.ru"
+    app_store_url: str = "https://apps.apple.com/app/id0000000000"
+
+    @property
+    def apple_team_id(self) -> str:
+        """Team ID для appIDs. Отдельного поля не заводим — он тот же, что у APNs."""
+        return self.apns_team_id
+
+    @property
+    def apple_bundle_id(self) -> str:
+        return self.apns_bundle_id
+
+    def share_url(self, event_id: object) -> str:
+        return f"https://{self.share_host}/e/{event_id}"
 
     @property
     def allowed_image_types_set(self) -> set[str]:

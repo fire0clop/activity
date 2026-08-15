@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 import app.models  # noqa: F401  (регистрирует таблицы в Base.metadata)
+from app.api.deeplinks import router as deeplinks_router
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
@@ -80,6 +81,8 @@ if settings.storage_backend == "local":
     app.mount("/media", StaticFiles(directory=settings.media_root), name="media")
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+# Универсальные ссылки живут в корне домена (без префикса /api/v1): так требует iOS.
+app.include_router(deeplinks_router)
 
 
 @app.get("/")
