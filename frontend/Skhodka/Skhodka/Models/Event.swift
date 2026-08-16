@@ -40,6 +40,7 @@ struct EventListItem: Decodable, Identifiable, Hashable {
     let priceSplit: String
     let status: String
     let distanceKm: Double?
+    let posterID: String?
     let organizer: OrganizerBrief
 
     /// Все картинки события для слайдера: обложка + галерея.
@@ -62,6 +63,7 @@ struct EventListItem: Decodable, Identifiable, Hashable {
         case participantsMax = "participants_max"
         case priceSplit = "price_split"
         case distanceKm = "distance_km"
+        case posterID = "poster_id"
     }
 }
 
@@ -89,6 +91,7 @@ struct EventDetail: Decodable, Identifiable {
     let priceSplit: String
     let status: String
     let distanceKm: Double?
+    let posterID: String?
     let organizer: OrganizerBrief
     let description: String?
     let minParticipants: Int
@@ -120,6 +123,7 @@ struct EventDetail: Decodable, Identifiable {
         case participantsMax = "participants_max"
         case priceSplit = "price_split"
         case distanceKm = "distance_km"
+        case posterID = "poster_id"
         case minParticipants = "min_participants"
         case autoAccept = "auto_accept"
         case createdAt = "created_at"
@@ -266,4 +270,6 @@ struct CreateEventBody: Encodable {
     var recurrence: String = "none"   // none | weekly
     /// Событие собрано по чужому «хочу»: сервер закроет запрос и позовёт тех, кто его ждал.
     var from_request_id: String? = nil
+    /// Событие собрано по карточке афиши.
+    var poster_id: String? = nil
 }

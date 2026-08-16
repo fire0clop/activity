@@ -127,6 +127,7 @@ async def create_event(
         price_split=body.price_split,
         auto_accept=body.auto_accept,
         recurrence=body.recurrence,
+        poster_id=body.poster_id,
         status="open",
     )
     db.add(event)

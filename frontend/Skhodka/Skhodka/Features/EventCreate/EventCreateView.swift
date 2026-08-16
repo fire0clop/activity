@@ -3,12 +3,15 @@ import PhotosUI
 import SwiftUI
 
 struct EventCreateView: View {
-    /// Заготовка формы, когда событие собирают по чужому «хочу».
+    /// Заготовка формы: событие собирают по чужому «хочу» или по карточке афиши.
     struct Prefill {
+        var title: String?
         var category: String?
         var coordinate: CLLocationCoordinate2D?
         var address: String?
+        var startsAt: Date?
         var fromRequestID: String?
+        var posterID: String?
     }
 
     var prefill: Prefill?
@@ -61,12 +64,7 @@ struct EventCreateView: View {
                     DatePicker("Начало", selection: $startsAt, in: Date()...)
                 }
                 FormSection(title: "Категория") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: Spacing.sm) {
-                            ForEach(Categories.pickable, id: \.self) { categoryChip($0) }
-                        }
-                        .padding(.vertical, 2)
-                    }
+                    CategoryPicker(selection: $category)
                 }
                 FormSection(title: "Где") {
                     Button { showPicker = true } label: {
@@ -155,7 +153,7 @@ struct EventCreateView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text(prefill?.fromRequestID == nil ? "Новое событие" : "Собираем по запросу")
+                Text(prefillTitle)
                     .font(.serifTitle(18, weight: .bold)).foregroundStyle(Theme.ink)
             }
         }
@@ -171,35 +169,24 @@ struct EventCreateView: View {
         }
     }
 
+    private var prefillTitle: String {
+        if prefill?.posterID != nil { return "Идём вместе" }
+        if prefill?.fromRequestID != nil { return "Собираем по запросу" }
+        return "Новое событие"
+    }
+
     /// Форма, открытая из чужого «хочу», приходит уже наполовину заполненной —
     /// организатору остаётся назначить время и уточнить место.
     private func applyPrefill() {
         guard let prefill, title.isEmpty else { return }
+        if let t = prefill.title { title = t }
         if let c = prefill.category, category.isEmpty { category = c }
         if let coord = prefill.coordinate, picked == nil { picked = coord }
         if let a = prefill.address, address.isEmpty { address = a }
+        // Время мероприятия из афиши — отправная точка; организатор может сдвинуть.
+        if let d = prefill.startsAt, d > Date() { startsAt = d }
     }
 
-    private func categoryChip(_ key: String) -> some View {
-        let c = Categories.of(key)
-        let selected = category == key
-        return Button {
-            category = selected ? "" : key
-            Haptics.tap()
-        } label: {
-            HStack(spacing: 5) {
-                // Цвет несёт иконка; текст — тёмный (контраст стабилен на любой пастели).
-                Image(systemName: c.icon).font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(selected ? .white : c.color)
-                Text(c.title).font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(selected ? .white : Theme.ink)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(selected ? c.color : c.color.opacity(0.14))
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
 
     private func loadPhotos(_ items: [PhotosPickerItem]) async {
         var images: [UIImage] = []
@@ -231,7 +218,8 @@ struct EventCreateView: View {
             price_split: priceSplit.rawValue,
             auto_accept: autoAccept,
             recurrence: repeatWeekly ? "weekly" : "none",
-            from_request_id: prefill?.fromRequestID
+            from_request_id: prefill?.fromRequestID,
+            poster_id: prefill?.posterID
         )
         do {
             let created: EventDetail = try await auth.api.send(Endpoint(

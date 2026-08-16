@@ -1,8 +1,9 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.core.categories import normalize
 from app.schemas.user import UserBrief
 
 
@@ -26,6 +27,13 @@ class EventCreateIn(BaseModel):
     recurrence: str = Field(default="none", pattern="^(none|weekly)$")
     # Событие собрано по чужому «хочу»: закрываем запрос и зовём тех, кто его ждал.
     from_request_id: uuid.UUID | None = None
+    # Событие собрано по карточке афиши: «идём вместе на этот концерт».
+    poster_id: uuid.UUID | None = None
+
+    @field_validator("category")
+    @classmethod
+    def _norm_category(cls, v: str | None) -> str | None:
+        return normalize(v)
 
     @model_validator(mode="after")
     def _check(self) -> "EventCreateIn":
@@ -69,6 +77,11 @@ class EventUpdateIn(BaseModel):
     price_split: str | None = Field(default=None, pattern="^(free|per_person|shared)$")
     auto_accept: bool | None = None
 
+    @field_validator("category")
+    @classmethod
+    def _norm_category(cls, v: str | None) -> str | None:
+        return normalize(v)
+
     @model_validator(mode="after")
     def _check(self) -> "EventUpdateIn":
         # Проверяем только когда способ оплаты меняют: частичное обновление не обязано
@@ -102,6 +115,7 @@ class EventListItem(BaseModel):
     price_split: str
     status: str
     distance_km: float | None
+    poster_id: uuid.UUID | None = None
     organizer: UserBrief
 
 

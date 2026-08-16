@@ -11,7 +11,8 @@ struct FeedView: View {
     @State private var camera: MapCameraPosition = .automatic
     @State private var showCityPicker = false
     @State private var showSubscriptions = false
-    @State private var showRequests = false
+    /// Активная страница ленты: 0 — активности, 1 — афиша, 2 — желания.
+    @State private var page = 0
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -19,17 +20,23 @@ struct FeedView: View {
         NavigationStack {
             ZStack(alignment: .top) {
                 Theme.paper.ignoresSafeArea()
-                if isMap { mapView } else { feed }
+                VStack(spacing: 0) {
+                    header.padding(.horizontal, 16).padding(.top, 8)
+                    pageSwitcher.padding(.horizontal, 16).padding(.top, 12)
+                    // Три страницы листаются пальцем: активности людей — основная,
+                    // афиша и желания живут рядом, а не в закопанных разделах.
+                    TabView(selection: $page) {
+                        activitiesPage.tag(0)
+                        PosterFeedView(coordinate: center).tag(1)
+                        RequestsView(coordinate: center, areaHint: vm.manualCity?.name,
+                                     embedded: true).tag(2)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.easeInOut(duration: 0.2), value: page)
+                }
             }
             .navigationBarHidden(true)
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
-            .navigationDestination(isPresented: $showRequests) {
-                RequestsView(
-                    coordinate: CLLocationCoordinate2D(latitude: vm.latitude,
-                                                       longitude: vm.longitude),
-                    areaHint: vm.manualCity?.name
-                )
-            }
             .task {
                 vm.configure(auth.api)
                 location.request()
@@ -56,12 +63,53 @@ struct FeedView: View {
         }
     }
 
+    /// Точка, вокруг которой смотрим все три раздела.
+    private var center: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: vm.latitude, longitude: vm.longitude)
+    }
+
+    /// Первая страница — то, что собирают сами люди. Карта относится только к ней.
+    @ViewBuilder
+    private var activitiesPage: some View {
+        if isMap { mapView } else { feed }
+    }
+
+    /// Переключатель страниц. Дублирует свайп кнопками: свайп сам по себе не виден,
+    /// и без подписей человек не узнает, что разделов три.
+    private var pageSwitcher: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(Self.pages.enumerated()), id: \.offset) { i, item in
+                Button {
+                    withAnimation { page = i }
+                    Haptics.tap()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: item.icon).font(.system(size: 11, weight: .bold))
+                        Text(item.title).font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(page == i ? .white : Theme.ink2)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(page == i ? Theme.ink : Theme.surface, in: Capsule())
+                    .overlay(Capsule().stroke(page == i ? .clear : Theme.line))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(item.title)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private static let pages: [(title: String, icon: String)] = [
+        ("Активности", "square.grid.2x2.fill"),
+        ("Афиша", "ticket.fill"),
+        ("Хочу", "hand.raised.fill"),
+    ]
+
     // MARK: - Feed (bento)
 
     private var feed: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                header
                 searchAndChips
                 if vm.items.isEmpty && vm.isLoading {
                     VStack(spacing: 16) {
@@ -100,22 +148,28 @@ struct FeedView: View {
                 }
                 .accessibilityLabel("Город: \(vm.manualCity?.name ?? "моё местоположение")")
                 .accessibilityHint("Выбрать другой город")
-                Text("Чем займёмся?").font(.display(34)).foregroundStyle(Theme.ink)
+                Text(Self.pages[page].title == "Активности" ? "Чем займёмся?" :
+                     (page == 1 ? "Что идёт рядом" : "Кто чего хочет"))
+                    .font(.display(30)).foregroundStyle(Theme.ink)
             }
             Spacer()
             HStack(spacing: 8) {
-                circleButton("hand.raised") { showRequests = true }
-                    .accessibilityLabel("Кто ищет компанию")
                 circleButton("bell") { showSubscriptions = true }
                     .accessibilityLabel("Подписки на события")
-                circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
-                    .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
-                NavigationLink { EventCreateView() } label: {
-                    Image(systemName: "plus").font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white).frame(width: 44, height: 44)
-                        .background(Theme.accent).clipShape(Circle())
+                // Карта осмысленна только для активностей людей.
+                if page == 0 {
+                    circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
+                        .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
                 }
-                .accessibilityLabel("Создать событие")
+                // Афишу заводит оператор, поэтому на её странице кнопки создания нет.
+                if page != 1 {
+                    NavigationLink { EventCreateView() } label: {
+                        Image(systemName: "plus").font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white).frame(width: 44, height: 44)
+                            .background(Theme.accent).clipShape(Circle())
+                    }
+                    .accessibilityLabel("Создать событие")
+                }
             }
         }
     }
@@ -273,7 +327,7 @@ struct FeedView: View {
 
             // Организовать готовы единицы, а сказать «хочу» — многие. В пустом городе
             // это единственный дешёвый способ показать, что тут вообще кто-то живой.
-            Button { showRequests = true } label: {
+            Button { withAnimation { page = 2 } } label: {
                 Text("Или скажите, чего хотите")
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.accentInk)
                     .padding(.horizontal, 18).padding(.vertical, 10)

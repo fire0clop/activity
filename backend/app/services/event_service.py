@@ -43,6 +43,7 @@ def build_list_item(
         price_split=event.price_split,
         status=event.status,
         distance_km=distance_km,
+        poster_id=event.poster_id,
         organizer=UserBrief.from_model(organizer),
     )
 
