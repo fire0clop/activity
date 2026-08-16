@@ -4,6 +4,7 @@ from app.models.conversation import Conversation, ConversationMember
 from app.models.event import Event
 from app.models.message import Message
 from app.models.participation import Participation
+from app.models.poster import PosterEvent
 from app.models.report import Block, DeviceToken, Report
 from app.models.request import CompanyRequest, RequestSupport
 from app.models.review import Review
@@ -23,6 +24,7 @@ __all__ = [
     "Report",
     "Block",
     "DeviceToken",
+    "PosterEvent",
     "CompanyRequest",
     "RequestSupport",
 ]

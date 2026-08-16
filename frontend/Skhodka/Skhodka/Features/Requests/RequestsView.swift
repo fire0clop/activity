@@ -10,6 +10,8 @@ import SwiftUI
 struct RequestsView: View {
     let coordinate: CLLocationCoordinate2D
     var areaHint: String?
+    /// Внутри страницы ленты свой заголовок и тулбар не нужны — они уже есть сверху.
+    var embedded: Bool = false
 
     @EnvironmentObject var auth: AuthManager
     @State private var items: [CompanyRequest] = []
@@ -45,11 +47,13 @@ struct RequestsView: View {
             .padding(16)
         }
         .background(Theme.paper.ignoresSafeArea())
-        .navigationTitle("Ищут компанию")
+        .navigationTitle(embedded ? "" : "Ищут компанию")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showCreate = true } label: { Image(systemName: "plus") }
+            if !embedded {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showCreate = true } label: { Image(systemName: "plus") }
+                }
             }
         }
         .sheet(isPresented: $showCreate) {
@@ -75,7 +79,9 @@ struct RequestsView: View {
     }
 
     private var header: some View {
-        Text("Здесь видно живой спрос: возьмите на себя то, чего хотят несколько человек, — и состав соберётся сам.")
+        Text(embedded
+             ? "Живой спрос: возьмите на себя то, чего хотят несколько человек."
+             : "Здесь видно живой спрос: возьмите на себя то, чего хотят несколько человек, — и состав соберётся сам.")
             .font(.footnote).foregroundStyle(Theme.ink2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 4)
@@ -183,6 +189,8 @@ struct RequestsView: View {
 struct CreateRequestView: View {
     let coordinate: CLLocationCoordinate2D
     var areaHint: String?
+    /// Внутри страницы ленты свой заголовок и тулбар не нужны — они уже есть сверху.
+    var embedded: Bool = false
     var onCreated: () -> Void = {}
 
     @EnvironmentObject var auth: AuthManager
@@ -199,24 +207,7 @@ struct CreateRequestView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     FormSection(title: "Чем заняться") {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(Categories.pickable, id: \.self) { key in
-                                    let c = Categories.of(key)
-                                    Button { category = key } label: {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: c.icon).font(.system(size: 11, weight: .bold))
-                                            Text(c.title).font(.system(size: 13, weight: .semibold))
-                                        }
-                                        .foregroundStyle(category == key ? .white : Theme.ink)
-                                        .padding(.horizontal, 12).padding(.vertical, 8)
-                                        .background(category == key ? c.color : Theme.secondaryBg,
-                                                    in: Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                        CategoryPicker(selection: $category)
                     }
                     FormSection(title: "Когда примерно") {
                         Picker("Когда", selection: $window) {

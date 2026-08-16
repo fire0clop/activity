@@ -65,25 +65,68 @@ struct CategoryStyle {
 }
 
 enum Categories {
+    /// Канонические категории: ключ → как показать. Держим в одном месте с бэкендом
+    /// (`app/core/categories.py`) — там тот же список для нормализации того, что
+    /// человек вписал руками.
     static let map: [String: CategoryStyle] = [
-        "watersport": .init(title: "Вода", icon: "drop.fill", color: Color(red: 0.16, green: 0.54, blue: 1.0)),
-        "tennis": .init(title: "Спорт", icon: "figure.tennis", color: Color(red: 0.15, green: 0.70, blue: 0.42)),
+        "walk": .init(title: "Прогулка", icon: "figure.walk", color: Color(red: 0.06, green: 0.71, blue: 0.64)),
         "sport": .init(title: "Спорт", icon: "figure.run", color: Color(red: 0.15, green: 0.70, blue: 0.42)),
+        "tennis": .init(title: "Спорт", icon: "figure.tennis", color: Color(red: 0.15, green: 0.70, blue: 0.42)),
+        "watersport": .init(title: "Вода", icon: "drop.fill", color: Color(red: 0.16, green: 0.54, blue: 1.0)),
+        "bike": .init(title: "Велосипед", icon: "bicycle", color: Color(red: 0.12, green: 0.64, blue: 0.56)),
+        "gym": .init(title: "Зал", icon: "dumbbell.fill", color: Color(red: 0.30, green: 0.56, blue: 0.38)),
+        "yoga": .init(title: "Йога", icon: "figure.mind.and.body", color: Color(red: 0.55, green: 0.44, blue: 0.85)),
+        "ski": .init(title: "Лыжи и сноуборд", icon: "figure.skiing.downhill", color: Color(red: 0.24, green: 0.60, blue: 0.90)),
+        "fishing": .init(title: "Рыбалка", icon: "fish.fill", color: Color(red: 0.14, green: 0.52, blue: 0.62)),
         "music": .init(title: "Музыка", icon: "music.note", color: Color(red: 0.49, green: 0.36, blue: 1.0)),
         "concert": .init(title: "Концерт", icon: "music.mic", color: Color(red: 0.49, green: 0.36, blue: 1.0)),
+        "party": .init(title: "Вечеринка", icon: "party.popper.fill", color: Color(red: 0.85, green: 0.30, blue: 0.62)),
+        "dance": .init(title: "Танцы", icon: "figure.dance", color: Color(red: 0.79, green: 0.31, blue: 0.70)),
         "boardgames": .init(title: "Настолки", icon: "die.face.5.fill", color: Color(red: 0.95, green: 0.63, blue: 0.07)),
-        "walk": .init(title: "Прогулка", icon: "figure.walk", color: Color(red: 0.06, green: 0.71, blue: 0.64)),
+        "videogames": .init(title: "Видеоигры", icon: "gamecontroller.fill", color: Color(red: 0.42, green: 0.44, blue: 0.90)),
+        "quiz": .init(title: "Квиз", icon: "questionmark.circle.fill", color: Color(red: 0.90, green: 0.55, blue: 0.15)),
         "food": .init(title: "Еда", icon: "fork.knife", color: Color(red: 0.92, green: 0.43, blue: 0.30)),
+        "bar": .init(title: "Бар", icon: "wineglass.fill", color: Color(red: 0.72, green: 0.24, blue: 0.36)),
+        "coffee": .init(title: "Кофе", icon: "cup.and.saucer.fill", color: Color(red: 0.62, green: 0.44, blue: 0.28)),
+        "cinema": .init(title: "Кино", icon: "film.fill", color: Color(red: 0.35, green: 0.35, blue: 0.55)),
+        "theatre": .init(title: "Театр", icon: "theatermasks.fill", color: Color(red: 0.70, green: 0.28, blue: 0.42)),
+        "museum": .init(title: "Музей", icon: "building.columns.fill", color: Color(red: 0.45, green: 0.42, blue: 0.62)),
+        "exhibition": .init(title: "Выставка", icon: "photo.artframe", color: Color(red: 0.52, green: 0.40, blue: 0.72)),
+        "festival": .init(title: "Фестиваль", icon: "flag.2.crossed.fill", color: Color(red: 0.88, green: 0.42, blue: 0.24)),
+        "photo": .init(title: "Фотопрогулка", icon: "camera.fill", color: Color(red: 0.38, green: 0.50, blue: 0.60)),
+        "travel": .init(title: "Поездка", icon: "airplane", color: Color(red: 0.20, green: 0.58, blue: 0.86)),
+        "roadtrip": .init(title: "Автопутешествие", icon: "car.fill", color: Color(red: 0.30, green: 0.46, blue: 0.70)),
+        "pets": .init(title: "С питомцами", icon: "pawprint.fill", color: Color(red: 0.76, green: 0.52, blue: 0.24)),
+        "volunteer": .init(title: "Волонтёрство", icon: "hands.sparkles.fill", color: Color(red: 0.18, green: 0.62, blue: 0.48)),
+        "study": .init(title: "Учёба", icon: "book.fill", color: Color(red: 0.40, green: 0.48, blue: 0.66)),
+        "other": .init(title: "Другое", icon: "sparkles", color: Theme.accent),
     ]
 
+    /// Неизвестный ключ — это своя категория: показываем её текстом как есть.
     static func of(_ key: String?) -> CategoryStyle {
         if let key, let c = map[key.lowercased()] { return c }
-        return .init(title: key?.isEmpty == false ? key! : "Событие", icon: "sparkles", color: Theme.accent)
+        guard let key, !key.isEmpty else {
+            return .init(title: "Событие", icon: "sparkles", color: Theme.accent)
+        }
+        return .init(title: key.prefix(1).uppercased() + key.dropFirst(),
+                     icon: "sparkles", color: Theme.accent)
     }
 
-    /// Упорядоченный набор ключей для выбора чипами (без дублей по смыслу).
-    static let pickable = ["walk", "sport", "watersport", "music", "boardgames", "food"]
+    /// Первый экран выбора: самое ходовое, чтобы не заставлять листать три десятка чипов.
+    static let popular = ["walk", "sport", "food", "bar", "music", "concert",
+                          "boardgames", "cinema", "watersport", "bike", "coffee", "party"]
+
+    /// Полный список для экрана «все категории», в порядке объявления.
+    static let all = ["walk", "sport", "watersport", "bike", "gym", "yoga", "ski", "fishing",
+                      "music", "concert", "party", "dance", "boardgames", "videogames", "quiz",
+                      "food", "bar", "coffee", "cinema", "theatre", "museum", "exhibition",
+                      "festival", "photo", "travel", "roadtrip", "pets", "volunteer",
+                      "study", "other"]
+
+    /// Совместимость со старым кодом выбора.
+    static var pickable: [String] { popular }
 }
+
 
 // MARK: - Типографика (сериф для заголовков = журнальный вид)
 

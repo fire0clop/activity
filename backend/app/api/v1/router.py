@@ -6,11 +6,13 @@ from sqlalchemy import text
 from app.api.v1 import (
     admin,
     auth,
+    categories,
     chat,
     connections,
     conversations,
     events,
     participations,
+    poster,
     reports,
     requests,
     reviews,
@@ -45,6 +47,8 @@ async def health(db: DbSession, redis: RedisDep) -> dict:
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(events.router)
+api_router.include_router(poster.router)
+api_router.include_router(categories.router)
 api_router.include_router(participations.router)
 api_router.include_router(conversations.router)
 api_router.include_router(connections.router)

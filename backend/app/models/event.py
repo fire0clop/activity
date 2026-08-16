@@ -71,6 +71,11 @@ class Event(Base, UUIDPrimaryKey, TimestampMixin):
     # status: open | full | closed | cancelled | finished
     status: Mapped[str] = mapped_column(String(16), default="open", index=True, nullable=False)
 
+    # Событие собрано по карточке афиши: «идём вместе на этот концерт».
+    poster_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("poster_events.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+
     # Напоминания участникам (свипер шлёт один раз в каждое окно).
     reminder_24h_sent: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
