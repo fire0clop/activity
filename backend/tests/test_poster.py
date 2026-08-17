@@ -133,3 +133,78 @@ async def test_categories_list_includes_custom(client, user_factory) -> None:
     assert by_key["настольный теннис"]["is_canonical"] is False
     assert by_key["настольный теннис"]["usage"] == 1
     assert by_key["настольный теннис"]["title"] == "Настольный теннис"
+
+
+# --- Импорт из внешнего источника -----------------------------------------
+
+_RAW_OK = {
+    "id": 172178,
+    "short_title": "концерт в главclub",
+    "title": "Полное название",
+    "description": "Описание",
+    "categories": ["concert"],
+    "dates": [{"start": 4102444800, "end": 4102448400}],   # заведомо в будущем
+    "place": {"title": "Главclub", "address": "Орджоникидзе, 11",
+              "coords": {"lat": 55.71, "lon": 37.61}},
+    "price": "от 2500 рублей",
+    "is_free": False,
+    "images": [{"image": "https://example.org/a.jpg"}],
+    "site_url": "https://example.org/e/1",
+}
+_RAW_PAST = {**_RAW_OK, "id": 3, "dates": [{"start": 1, "end": 2}]}
+_RAW_NO_PLACE = {**_RAW_OK, "id": 4, "place": None}
+
+
+@pytest.mark.asyncio
+async def test_import_creates_updates_and_skips(client, user_factory, monkeypatch) -> None:
+    """Импорт идемпотентен и отбрасывает то, что нельзя показать в гео-афише."""
+    from app.db.session import SessionLocal
+    from app.services import poster_import
+
+    monkeypatch.setattr(poster_import, "fetch_city",
+                        lambda city, *, limit: [_RAW_OK, _RAW_PAST, _RAW_NO_PLACE])
+
+    async with SessionLocal() as db:
+        first = await poster_import.import_city(db, "msk")
+        assert (first["created"], first["skipped"]) == (1, 2)
+
+        # повторный прогон обновляет ту же карточку, а не плодит дубликаты
+        second = await poster_import.import_city(db, "msk")
+        assert (second["created"], second["updated"]) == (0, 1)
+
+    viewer = await user_factory("Зритель")
+    feed = (await client.get("/poster", headers=viewer["headers"],
+                             params={"lat": 55.71, "lng": 37.61})).json()
+    assert len(feed["items"]) == 1
+    item = feed["items"][0]
+    assert item["title"] == "Концерт в главclub"     # источник даёт нижний регистр
+    assert item["price_from"] == 2500                # цена вытащена из фразы
+    assert item["category"] == "concert"
+    assert item["source_name"] == "KudaGo"
+
+
+@pytest.mark.asyncio
+async def test_import_endpoint_requires_admin(client, user_factory, admin_headers,
+                                              monkeypatch) -> None:
+    from app.services import poster_import
+
+    monkeypatch.setattr(poster_import, "fetch_city", lambda city, *, limit: [_RAW_OK])
+    user = await user_factory("Обычный")
+
+    assert (await client.post("/poster/import", headers=user["headers"])).status_code == 403
+    ok = await client.post("/poster/import", headers=admin_headers, params={"city": "msk"})
+    assert ok.status_code == 200
+    assert ok.json()[0]["created"] == 1
+
+    bad_city = await client.post("/poster/import", headers=admin_headers,
+                                 params={"city": "paris"})
+    assert bad_city.status_code == 404
+
+
+def test_price_is_parsed_from_free_text() -> None:
+    from app.services.poster_import import _parse_price
+
+    assert _parse_price("от 2 500 рублей", False) == 2500
+    assert _parse_price("вход свободный", True) is None
+    assert _parse_price("", False) is None
+    assert _parse_price("билеты уточняйте", False) is None
