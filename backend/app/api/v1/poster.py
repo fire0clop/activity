@@ -157,6 +157,27 @@ async def update_poster(
     return _build(poster, distance_km=None, gatherings=0)
 
 
+@router.post("/import", response_model=list[dict])
+async def import_poster(
+    _: AdminGuard,
+    db: DbSession,
+    city: str | None = Query(None, description="Город источника; по умолчанию все"),
+    limit: int = Query(200, ge=1, le=500),
+) -> list[dict]:
+    """Подтянуть афишу из внешнего источника.
+
+    Идемпотентно: карточки опознаются по ключу источника, повторный вызов обновляет
+    даты, а не плодит дубликаты. Тот же импорт запускается сам раз в шесть часов.
+    """
+    from app.services import poster_import
+
+    if city:
+        if city not in poster_import.CITIES:
+            raise not_found(f"Город не поддерживается источником: {city}")
+        return [await poster_import.import_city(db, city, limit=limit)]
+    return await poster_import.import_all(db, limit=limit)
+
+
 @router.delete("/{poster_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def hide_poster(poster_id: uuid.UUID, _: AdminGuard, db: DbSession) -> None:
     """Снимаем с публикации, а не удаляем: на карточку могут ссылаться собранные события."""

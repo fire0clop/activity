@@ -61,6 +61,12 @@ class PosterEvent(Base, UUIDPrimaryKey, TimestampMixin):
     source_url: Mapped[str | None] = mapped_column(String, nullable=True)
     source_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
+    # Ключ записи у источника: "kudago:172178". По нему повторный импорт обновляет
+    # карточку, а не плодит дубликаты — расписание у мероприятий сдвигается.
+    source_ref: Mapped[str | None] = mapped_column(
+        String(120), unique=True, index=True, nullable=True
+    )
+
     status: Mapped[str] = mapped_column(
         String(16), default="published", server_default="published", index=True, nullable=False
     )

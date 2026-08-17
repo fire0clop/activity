@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     user_rl_requests_per_hour: int = 20     # «ищу компанию» (дешевле события — лимит мягче)
     user_rl_messages_per_min: int = 60      # сообщения в чате (WS)
 
+    # Афиша: фоновое обновление из внешнего источника. По умолчанию выключено, чтобы
+    # тесты и локальная разработка не ходили в чужой API; в проде включается явно.
+    poster_import_enabled: bool = False
+
     # Storage
     storage_backend: str = "local"  # local | s3
     media_root: str = "/app/media"

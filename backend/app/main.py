@@ -22,7 +22,7 @@ from app.core.middleware import (
 )
 from app.db.base import Base
 from app.db.session import engine
-from app.services.lifecycle import run_sweeper
+from app.services.lifecycle import run_poster_import, run_sweeper
 from app.services.storage_service import S3Storage, get_storage
 from app.ws.manager import manager
 
@@ -50,11 +50,15 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
 
     sweeper = asyncio.create_task(run_sweeper())
+    # Афиша обновляется из внешнего источника отдельной задачей, раз в шесть часов.
+    poster_importer = asyncio.create_task(run_poster_import()) if settings.poster_import_enabled else None
     logger.info("startup complete (env=%s, storage=%s)", settings.app_env, settings.storage_backend)
 
     yield
 
     sweeper.cancel()
+    if poster_importer is not None:
+        poster_importer.cancel()
     await manager.stop()
     await app.state.redis.aclose()
     await engine.dispose()

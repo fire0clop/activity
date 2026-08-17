@@ -108,6 +108,31 @@ async def _expire_requests_once() -> int:
         return n
 
 
+POSTER_IMPORT_INTERVAL_SEC = 6 * 3600
+
+
+async def run_poster_import() -> None:
+    """Обновление афиши из внешнего источника.
+
+    Отдельной задачей, а не внутри свипера: свипер ходит раз в пять минут, а дёргать
+    чужой API с такой частотой незачем — расписание мероприятий так быстро не меняется.
+    """
+    from app.services import poster_import
+
+    while True:
+        try:
+            async with SessionLocal() as db:
+                stats = await poster_import.import_all(db)
+            total = sum(s["created"] + s["updated"] for s in stats)
+            if total:
+                logger.info("афиша обновлена: %s", stats)
+        except asyncio.CancelledError:
+            break
+        except Exception:  # noqa: BLE001 - недоступность источника не должна ронять приложение
+            logger.exception("не удалось обновить афишу")
+        await asyncio.sleep(POSTER_IMPORT_INTERVAL_SEC)
+
+
 async def run_sweeper() -> None:
     """Фоновая задача: авто-финиш прошедших событий, архивация чатов, напоминания участникам."""
     while True:
