@@ -2,11 +2,11 @@
   <img src="docs/banner.svg" alt="activity banner" width="100%">
 </p>
 
-# Activity
+# Elva
 
 **Create a "let's do X, looking for company" post in under a minute — and find 2–5 people nearby who want in.**
 
-Activity (internal codename *Skhodka* — Russian for "meetup") is a location-based, activity-agnostic meetup app. Anyone can post *what they want to do, when, and where* — jet skis, tennis, a concert, a walk, board games, a museum trip — and people nearby see it in a geo feed and request to join. Once the organizer accepts, a group chat spins up automatically, and after the event both sides leave short two-way reviews to build trust.
+Elva is a location-based, activity-agnostic meetup app. Anyone can post *what they want to do, when, and where* — jet skis, tennis, a concert, a walk, board games, a museum trip — and people nearby see it in a geo feed and request to join. Once the organizer accepts, a group chat spins up automatically, and after the event both sides leave short two-way reviews to build trust.
 
 The repository contains a native **SwiftUI iOS client** and an **async FastAPI backend** backed by **PostgreSQL + PostGIS**, with real-time chat over WebSockets and push notifications via **APNs** (iOS) and **FCM** (Android-ready).
 
@@ -159,8 +159,8 @@ activity/
 │   ├── docker-compose.prod.yml    # prod (gunicorn workers + migrate)
 │   └── requirements.txt
 └── frontend/
-    └── Skhodka/                   # SwiftUI iOS app (XcodeGen project)
-        └── Skhodka/
+    └── Elva/                      # SwiftUI iOS app (XcodeGen project)
+        └── Elva/
             ├── Config/            # AppConfig (backend host)
             ├── Core/              # Networking, Auth, Push, Location, Extensions
             ├── Models/            # Codable DTOs
@@ -205,9 +205,9 @@ uvicorn app.main:app --reload
 Requires Xcode 15+ (iOS 17 SDK) and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```bash
-cd frontend/Skhodka
-xcodegen generate            # builds Skhodka.xcodeproj from project.yml
-open Skhodka.xcodeproj
+cd frontend/Elva
+xcodegen generate            # builds Elva.xcodeproj from project.yml
+open Elva.xcodeproj
 ```
 
 - The Simulator reaches the backend at `localhost:8080` by default.

@@ -91,4 +91,4 @@ app.include_router(deeplinks_router)
 
 @app.get("/")
 async def root() -> dict:
-    return {"service": "skhodka-api", "docs": "/docs", "health": f"{settings.api_v1_prefix}/health"}
+    return {"service": "elva-api", "docs": "/docs", "health": f"{settings.api_v1_prefix}/health"}

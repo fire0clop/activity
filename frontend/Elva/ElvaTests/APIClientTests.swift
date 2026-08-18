@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Skhodka
+@testable import Elva
 
 /// Сетевые тесты сериализованы: MockURLProtocol.handler — общий для процесса.
 @Suite("APIClient", .serialized)

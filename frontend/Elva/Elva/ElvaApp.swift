@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SkhodkaApp: App {
+struct ElvaApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var auth = AuthManager()
 

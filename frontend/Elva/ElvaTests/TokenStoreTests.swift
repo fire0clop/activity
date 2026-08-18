@@ -1,5 +1,5 @@
 import Testing
-@testable import Skhodka
+@testable import Elva
 
 @Suite("TokenStore", .serialized)
 struct TokenStoreTests {

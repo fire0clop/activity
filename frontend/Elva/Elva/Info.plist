@@ -7,7 +7,7 @@
 	<key>APIScheme</key>
 	<string>$(API_SCHEME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Сходка</string>
+	<string>Elva</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Skhodka
+@testable import Elva
 
 @Suite("ParticipationStatus")
 struct ParticipationStatusTests {
