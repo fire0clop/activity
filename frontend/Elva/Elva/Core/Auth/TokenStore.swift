@@ -3,7 +3,7 @@ import Security
 
 /// Безопасное хранение access/refresh токенов в Keychain.
 final class TokenStore {
-    private let service = "com.elva.app.tokens"
+    private let service = "ru.elva.app.tokens"
     private let accessKey = "access_token"
     private let refreshKey = "refresh_token"
 
