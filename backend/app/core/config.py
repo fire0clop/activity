@@ -94,10 +94,10 @@ class Settings(BaseSettings):
     apns_key_path: str = ""        # путь к .p8 (AuthKey_XXXX.p8)
     apns_key_id: str = ""          # Key ID ключа
     apns_team_id: str = ""         # Team ID разработчика
-    apns_bundle_id: str = "com.skhodka.app"
+    apns_bundle_id: str = "com.elva.app"
 
     # Sign in with Apple: audience (client_id) = bundle id приложения.
-    apple_client_id: str = "com.skhodka.app"
+    apple_client_id: str = "com.elva.app"
     apns_use_sandbox: bool = True  # True для dev-сборок, False для App Store / TestFlight
 
     # Универсальные ссылки: домен, с которого раздаётся apple-app-site-association,

@@ -1,6 +1,6 @@
-# Сходка — Backend (FastAPI)
+# Elva — Backend (FastAPI)
 
-Бэкенд приложения «Сходка». Полный план и контракт API — в [ROADMAP.md](ROADMAP.md).
+Бэкенд приложения Elva. Полный план и контракт API — в [ROADMAP.md](ROADMAP.md).
 
 ## Быстрый старт (dev)
 

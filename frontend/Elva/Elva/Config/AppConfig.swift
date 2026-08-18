@@ -12,7 +12,7 @@ enum AppConfig {
     static let wsBaseURL = URL(string: "\(wsScheme)://\(host)/api/v1")!
 
     /// Домен универсальных ссылок. Он же раздаёт apple-app-site-association, поэтому
-    /// обязан совпадать с applinks-записью в Skhodka.entitlements.
+    /// обязан совпадать с applinks-записью в Elva.entitlements.
     static let shareHost = "event-serv.ru"
 
     /// Ссылка на событие для мессенджеров: с приложением открывает карточку,

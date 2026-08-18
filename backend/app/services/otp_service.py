@@ -46,7 +46,7 @@ async def request_code(redis: Redis, phone: str) -> int:
 async def _send_sms(phone: str, code: str) -> None:
     """Отправка кода. stub — пишет в лог (dev); smsc — реальная отправка через SMSC.ru."""
     # Код в начале + ключевое слово — так iOS надёжнее предлагает автоподстановку.
-    text = f"{code} - kod podtverzhdeniya Skhodka"
+    text = f"{code} - kod podtverzhdeniya Elva"
     if settings.sms_provider == "stub":
         logger.warning("[OTP] SMS to %s: code=%s", phone, code)
     elif settings.sms_provider == "smsc":
