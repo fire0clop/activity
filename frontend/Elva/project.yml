@@ -1,6 +1,6 @@
 name: Elva
 options:
-  bundleIdPrefix: com.elva
+  bundleIdPrefix: ru.elva
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -23,7 +23,7 @@ targets:
       - Elva
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.elva.app
+        PRODUCT_BUNDLE_IDENTIFIER: ru.elva.app
         INFOPLIST_FILE: Elva/Info.plist
         CODE_SIGN_ENTITLEMENTS: Elva/Elva.entitlements
         TARGETED_DEVICE_FAMILY: "1"

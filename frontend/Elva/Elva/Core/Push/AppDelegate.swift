@@ -2,7 +2,7 @@ import OSLog
 import UIKit
 import UserNotifications
 
-private let pushLog = Logger(subsystem: "com.elva.app", category: "push")
+private let pushLog = Logger(subsystem: "ru.elva.app", category: "push")
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
