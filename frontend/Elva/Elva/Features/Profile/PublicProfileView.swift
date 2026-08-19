@@ -25,17 +25,15 @@ struct PublicProfileView: View {
             if let u = user {
                 content(u)
             } else if isLoading {
-                ProgressView().padding(40)
-            } else if let loadError {
-                VStack(spacing: 12) {
-                    Text(loadError).foregroundStyle(.secondary)
-                    Button("Повторить") { Task { await load() } }
-                        .font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
-                }.padding(40)
+                ProgressView().tint(Theme.accent).padding(40)
+            } else if loadError != nil {
+                ErrorState(title: "Не удалось загрузить профиль") { Task { await load() } }
             } else {
-                Text("Профиль не найден").foregroundStyle(.secondary).padding()
+                EmptyState(icon: "person.crop.circle.badge.questionmark",
+                           title: "Профиль не найден")
             }
         }
+        .background(Theme.paper.ignoresSafeArea())
         .navigationTitle("Профиль")
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $fullScreen) {
@@ -63,20 +61,27 @@ struct PublicProfileView: View {
     @ViewBuilder
     private func content(_ u: UserPublic) -> some View {
         VStack(spacing: 16) {
-            avatar(u.avatarURL, name: u.name).frame(width: 96, height: 96)
-            Text(u.name ?? "Пользователь").font(.title2).fontWeight(.bold)
-            // Рейтинга у новичка нет — вместо нуля честная пометка; неявки, если были.
-            HStack(spacing: 8) {
-                RatingView(value: u.ratingAvg, count: u.ratingCount, showsNewcomer: true)
-                NoShowBadge(count: u.noShows)
+            VStack(spacing: 12) {
+                AvatarCircle(url: u.avatarURL, name: u.name, size: 96)
+                Text(u.name ?? "Пользователь")
+                    .font(.serifTitle(24, weight: .bold)).foregroundStyle(Theme.ink)
+                // Рейтинга у новичка нет — вместо нуля честная пометка; неявки, если были.
+                HStack(spacing: 8) {
+                    RatingView(value: u.ratingAvg, count: u.ratingCount, showsNewcomer: true)
+                    NoShowBadge(count: u.noShows)
+                }
+                if let bio = u.bio, !bio.isEmpty {
+                    Text(bio).font(.system(size: 15)).foregroundStyle(Theme.ink.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                }
             }
-            if let bio = u.bio, !bio.isEmpty {
-                Text(bio).multilineTextAlignment(.center).padding(.horizontal)
-            }
-            HStack(spacing: 20) {
-                stat("Создал", u.eventsCreated)
-                stat("Посетил", u.eventsAttended)
-            }
+            .padding(16).frame(maxWidth: .infinity).cardStyle()
+
+            MetricsRow(items: [
+                .init(value: "\(u.eventsCreated)", label: "Создал"),
+                .init(value: "\(u.eventsAttended)", label: "Посетил"),
+                .init(value: "\(u.ratingCount)", label: "Отзывов"),
+            ])
 
             if !u.photoURLs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -95,16 +100,18 @@ struct PublicProfileView: View {
 
             if !reviews.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Отзывы").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Отзывы").font(.serifTitle(19, weight: .semibold)).foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     ForEach(reviews) { r in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(r.author.name ?? "Аноним").font(.subheadline).fontWeight(.medium)
+                                Text(r.author.name ?? "Аноним").font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Theme.ink)
                                 Spacer()
                                 ReviewVerdict(rating: r.rating, attended: r.didAttend)
                             }
                             if let c = r.comment, !c.isEmpty {
-                                Text(c).font(.footnote).foregroundStyle(.secondary)
+                                Text(c).font(.footnote).foregroundStyle(Theme.ink2)
                             }
                         }
                         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
@@ -114,10 +121,10 @@ struct PublicProfileView: View {
             }
 
             if let statusText {
-                Text(statusText).font(.footnote).foregroundStyle(.secondary)
+                Text(statusText).font(.footnote).foregroundStyle(Theme.ink2)
             }
             if let actionError {
-                Text(actionError).font(.footnote).foregroundStyle(.red)
+                Text(actionError).font(.footnote).foregroundStyle(Theme.dangerInk)
             }
 
             if u.id != auth.me?.id {

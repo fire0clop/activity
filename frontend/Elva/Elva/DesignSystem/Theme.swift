@@ -9,12 +9,17 @@ enum Theme {
     static let surface = Color.white                                    // карточки
     static let ink = Color(red: 0.11, green: 0.10, blue: 0.08)          // тёмный текст
     static let ink2 = Color(red: 0.34, green: 0.32, blue: 0.28)         // вторичный текст (≥4.5:1 на бумаге)
-    static let line = Color(red: 0.90, green: 0.88, blue: 0.82)         // хайрлайны
-    static let accent = Color(red: 1.0, green: 0.31, blue: 0.18)        // коралл-акцент (крупные кнопки/иконки)
-    static let accentInk = Color(red: 0.85, green: 0.24, blue: 0.10)    // затемнённый коралл для ТЕКСТА/ссылок/пузырей (≥4.5:1)
+    static let line = Color(red: 0.90, green: 0.88, blue: 0.82)         // декоративные разделители
+    static let lineStrong = Color(red: 0.80, green: 0.77, blue: 0.70)   // обводка карточек и полей
+    static let inkMuted = Color(red: 0.58, green: 0.55, blue: 0.48)     // выключенные глифы, пустые звёзды
+    static let skeleton = Color(red: 0.91, green: 0.895, blue: 0.855)   // заглушки загрузки
+    static let accent = Color(red: 1.0, green: 0.31, blue: 0.18)        // коралл: заливки и иконки
+    // Текст и заливки под белым текстом: 5.2:1 на бумаге, 5.6:1 под белым.
+    static let accentInk = Color(red: 0.76, green: 0.19, blue: 0.06)
     static let accentSoft = Color(red: 1.0, green: 0.31, blue: 0.18).opacity(0.12)
     static let star = Color(red: 0.98, green: 0.70, blue: 0.10)         // цвет рейтинга-звезды
-    static let danger = Color(red: 0.85, green: 0.20, blue: 0.16)       // ошибки/деструктив
+    static let danger = Color(red: 0.85, green: 0.20, blue: 0.16)       // заливки и иконки ошибок
+    static let dangerInk = Color(red: 0.75, green: 0.15, blue: 0.12)    // текст ошибок: 4.8:1 на своей плашке
 
     // Совместимость со старым кодом
     static let bg = paper
@@ -61,55 +66,61 @@ struct CardButtonStyle: ButtonStyle {
 struct CategoryStyle {
     let title: String
     let icon: String
+    /// Плотная заливка: белый текст на ней читается.
     let color: Color
+    /// Мягкая плашка того же тона — невыбранные чипы и подложки.
+    var tint: Color { color.opacity(0.13) }
 }
 
 enum Categories {
     /// Канонические категории: ключ → как показать. Держим в одном месте с бэкендом
     /// (`app/core/categories.py`) — там тот же список для нормализации того, что
     /// человек вписал руками.
+    /// Цвета в одном тональном регистре: одинаковая светлота, разный тон. Так белый
+    /// текст читается на любой плашке, а сами цвета на бумаге не скачут по яркости —
+    /// картинка получается цветной, но не пёстрой.
     static let map: [String: CategoryStyle] = [
-        "walk": .init(title: "Прогулка", icon: "figure.walk", color: Color(red: 0.06, green: 0.71, blue: 0.64)),
-        "sport": .init(title: "Спорт", icon: "figure.run", color: Color(red: 0.15, green: 0.70, blue: 0.42)),
-        "tennis": .init(title: "Спорт", icon: "figure.tennis", color: Color(red: 0.15, green: 0.70, blue: 0.42)),
-        "watersport": .init(title: "Вода", icon: "drop.fill", color: Color(red: 0.16, green: 0.54, blue: 1.0)),
-        "bike": .init(title: "Велосипед", icon: "bicycle", color: Color(red: 0.12, green: 0.64, blue: 0.56)),
-        "gym": .init(title: "Зал", icon: "dumbbell.fill", color: Color(red: 0.30, green: 0.56, blue: 0.38)),
-        "yoga": .init(title: "Йога", icon: "figure.mind.and.body", color: Color(red: 0.55, green: 0.44, blue: 0.85)),
-        "ski": .init(title: "Лыжи и сноуборд", icon: "figure.skiing.downhill", color: Color(red: 0.24, green: 0.60, blue: 0.90)),
-        "fishing": .init(title: "Рыбалка", icon: "fish.fill", color: Color(red: 0.14, green: 0.52, blue: 0.62)),
-        "music": .init(title: "Музыка", icon: "music.note", color: Color(red: 0.49, green: 0.36, blue: 1.0)),
-        "concert": .init(title: "Концерт", icon: "music.mic", color: Color(red: 0.49, green: 0.36, blue: 1.0)),
-        "party": .init(title: "Вечеринка", icon: "party.popper.fill", color: Color(red: 0.85, green: 0.30, blue: 0.62)),
-        "dance": .init(title: "Танцы", icon: "figure.dance", color: Color(red: 0.79, green: 0.31, blue: 0.70)),
-        "boardgames": .init(title: "Настолки", icon: "die.face.5.fill", color: Color(red: 0.95, green: 0.63, blue: 0.07)),
-        "videogames": .init(title: "Видеоигры", icon: "gamecontroller.fill", color: Color(red: 0.42, green: 0.44, blue: 0.90)),
-        "quiz": .init(title: "Квиз", icon: "questionmark.circle.fill", color: Color(red: 0.90, green: 0.55, blue: 0.15)),
-        "food": .init(title: "Еда", icon: "fork.knife", color: Color(red: 0.92, green: 0.43, blue: 0.30)),
-        "bar": .init(title: "Бар", icon: "wineglass.fill", color: Color(red: 0.72, green: 0.24, blue: 0.36)),
-        "coffee": .init(title: "Кофе", icon: "cup.and.saucer.fill", color: Color(red: 0.62, green: 0.44, blue: 0.28)),
-        "cinema": .init(title: "Кино", icon: "film.fill", color: Color(red: 0.35, green: 0.35, blue: 0.55)),
-        "theatre": .init(title: "Театр", icon: "theatermasks.fill", color: Color(red: 0.70, green: 0.28, blue: 0.42)),
-        "museum": .init(title: "Музей", icon: "building.columns.fill", color: Color(red: 0.45, green: 0.42, blue: 0.62)),
-        "exhibition": .init(title: "Выставка", icon: "photo.artframe", color: Color(red: 0.52, green: 0.40, blue: 0.72)),
-        "festival": .init(title: "Фестиваль", icon: "flag.2.crossed.fill", color: Color(red: 0.88, green: 0.42, blue: 0.24)),
-        "photo": .init(title: "Фотопрогулка", icon: "camera.fill", color: Color(red: 0.38, green: 0.50, blue: 0.60)),
-        "travel": .init(title: "Поездка", icon: "airplane", color: Color(red: 0.20, green: 0.58, blue: 0.86)),
-        "roadtrip": .init(title: "Автопутешествие", icon: "car.fill", color: Color(red: 0.30, green: 0.46, blue: 0.70)),
-        "pets": .init(title: "С питомцами", icon: "pawprint.fill", color: Color(red: 0.76, green: 0.52, blue: 0.24)),
-        "volunteer": .init(title: "Волонтёрство", icon: "hands.sparkles.fill", color: Color(red: 0.18, green: 0.62, blue: 0.48)),
-        "study": .init(title: "Учёба", icon: "book.fill", color: Color(red: 0.40, green: 0.48, blue: 0.66)),
-        "other": .init(title: "Другое", icon: "sparkles", color: Theme.accent),
+        "walk": .init(title: "Прогулка", icon: "figure.walk", color: Color(red: 0.03, green: 0.52, blue: 0.46)),
+        "sport": .init(title: "Спорт", icon: "figure.run", color: Color(red: 0.10, green: 0.53, blue: 0.31)),
+        "tennis": .init(title: "Спорт", icon: "figure.tennis", color: Color(red: 0.10, green: 0.53, blue: 0.31)),
+        "watersport": .init(title: "Вода", icon: "drop.fill", color: Color(red: 0.00, green: 0.43, blue: 0.96)),
+        "bike": .init(title: "Велосипед", icon: "bicycle", color: Color(red: 0.08, green: 0.52, blue: 0.45)),
+        "gym": .init(title: "Зал", icon: "dumbbell.fill", color: Color(red: 0.26, green: 0.51, blue: 0.34)),
+        "yoga": .init(title: "Йога", icon: "figure.mind.and.body", color: Color(red: 0.50, green: 0.37, blue: 0.85)),
+        "ski": .init(title: "Лыжи и сноуборд", icon: "figure.skiing.downhill", color: Color(red: 0.08, green: 0.47, blue: 0.79)),
+        "fishing": .init(title: "Рыбалка", icon: "fish.fill", color: Color(red: 0.12, green: 0.50, blue: 0.60)),
+        "music": .init(title: "Музыка", icon: "music.note", color: Color(red: 0.47, green: 0.34, blue: 1.00)),
+        "concert": .init(title: "Концерт", icon: "music.mic", color: Color(red: 0.47, green: 0.34, blue: 1.00)),
+        "party": .init(title: "Вечеринка", icon: "party.popper.fill", color: Color(red: 0.84, green: 0.16, blue: 0.55)),
+        "dance": .init(title: "Танцы", icon: "figure.dance", color: Color(red: 0.78, green: 0.22, blue: 0.67)),
+        "boardgames": .init(title: "Настолки", icon: "die.face.5.fill", color: Color(red: 0.64, green: 0.41, blue: 0.02)),
+        "videogames": .init(title: "Видеоигры", icon: "gamecontroller.fill", color: Color(red: 0.38, green: 0.40, blue: 0.91)),
+        "quiz": .init(title: "Квиз", icon: "questionmark.circle.fill", color: Color(red: 0.68, green: 0.39, blue: 0.06)),
+        "food": .init(title: "Еда", icon: "fork.knife", color: Color(red: 0.85, green: 0.23, blue: 0.07)),
+        "bar": .init(title: "Бар", icon: "wineglass.fill", color: Color(red: 0.73, green: 0.23, blue: 0.35)),
+        "coffee": .init(title: "Кофе", icon: "cup.and.saucer.fill", color: Color(red: 0.60, green: 0.42, blue: 0.26)),
+        "cinema": .init(title: "Кино", icon: "film.fill", color: Color(red: 0.34, green: 0.34, blue: 0.56)),
+        "theatre": .init(title: "Театр", icon: "theatermasks.fill", color: Color(red: 0.71, green: 0.27, blue: 0.42)),
+        "museum": .init(title: "Музей", icon: "building.columns.fill", color: Color(red: 0.45, green: 0.41, blue: 0.63)),
+        "exhibition": .init(title: "Выставка", icon: "photo.artframe", color: Color(red: 0.52, green: 0.39, blue: 0.73)),
+        "festival": .init(title: "Фестиваль", icon: "flag.2.crossed.fill", color: Color(red: 0.79, green: 0.30, blue: 0.10)),
+        "photo": .init(title: "Фотопрогулка", icon: "camera.fill", color: Color(red: 0.35, green: 0.47, blue: 0.57)),
+        "travel": .init(title: "Поездка", icon: "airplane", color: Color(red: 0.11, green: 0.48, blue: 0.75)),
+        "roadtrip": .init(title: "Автопутешествие", icon: "car.fill", color: Color(red: 0.29, green: 0.46, blue: 0.71)),
+        "pets": .init(title: "С питомцами", icon: "pawprint.fill", color: Color(red: 0.62, green: 0.42, blue: 0.18)),
+        "volunteer": .init(title: "Волонтёрство", icon: "hands.sparkles.fill", color: Color(red: 0.14, green: 0.52, blue: 0.40)),
+        "study": .init(title: "Учёба", icon: "book.fill", color: Color(red: 0.37, green: 0.46, blue: 0.66)),
+        "other": .init(title: "Другое", icon: "sparkles", color: Theme.accentInk),
     ]
 
     /// Неизвестный ключ — это своя категория: показываем её текстом как есть.
     static func of(_ key: String?) -> CategoryStyle {
         if let key, let c = map[key.lowercased()] { return c }
         guard let key, !key.isEmpty else {
-            return .init(title: "Событие", icon: "sparkles", color: Theme.accent)
+            return .init(title: "Событие", icon: "sparkles", color: Theme.accentInk)
         }
         return .init(title: key.prefix(1).uppercased() + key.dropFirst(),
-                     icon: "sparkles", color: Theme.accent)
+                     icon: "sparkles", color: Theme.accentInk)
     }
 
     /// Первый экран выбора: самое ходовое, чтобы не заставлять листать три десятка чипов.
@@ -143,16 +154,25 @@ extension Font {
 struct CategoryBadge: View {
     let category: String?
     var compact: Bool = false
+    /// `.solid` — поверх фотографии, `.tinted` — на бумаге, где плотная плашка бьёт по глазам.
+    var style: Style = .solid
+    enum Style { case solid, tinted }
+
     var body: some View {
         let c = Categories.of(category)
         HStack(spacing: 5) {
             Image(systemName: c.icon).font(.system(size: compact ? 10 : 12, weight: .bold))
-            if !compact { Text(c.title.uppercased()).font(.system(size: 11, weight: .heavy)).tracking(0.5) }
+            if !compact {
+                Text(c.title.uppercased())
+                    .font(.system(size: 11, weight: .heavy)).tracking(0.6)
+                    // Своя категория бывает длинной — режем, а не ломаем строку.
+                    .lineLimit(1).truncationMode(.tail)
+            }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(style == .solid ? Color.white : c.color)
         .padding(.horizontal, compact ? 7 : 10).padding(.vertical, compact ? 5 : 6)
-        .background(c.color)
-        .clipShape(Capsule())
+        .background(style == .solid ? c.color : c.tint, in: Capsule())
+        .overlay(Capsule().stroke(style == .solid ? .clear : c.color.opacity(0.25), lineWidth: 1))
     }
 }
 
@@ -184,7 +204,7 @@ struct PrimaryButton: View {
                 else { Text(title).font(.system(size: 17, weight: .bold)) }
             }
             .frame(maxWidth: .infinity, minHeight: 54)
-            .background(isEnabled ? Theme.accent : Theme.ink.opacity(0.18))
+            .background(isEnabled ? Theme.accentInk : Theme.ink.opacity(0.12))
             .foregroundStyle(isEnabled ? .white : Theme.ink2)
             .clipShape(RoundedRectangle(cornerRadius: Radii.sm))
         }
@@ -245,7 +265,7 @@ struct ReviewVerdict: View {
                 ForEach(1...5, id: \.self) { i in
                     Image(systemName: i <= rating ? "star.fill" : "star")
                         .font(.system(size: 10))
-                        .foregroundStyle(i <= rating ? Theme.star : Theme.line)
+                        .foregroundStyle(i <= rating ? Theme.star : Theme.inkMuted)
                 }
             }
             .accessibilityElement(children: .ignore)
@@ -263,9 +283,9 @@ struct NoShowBadge: View {
                 Image(systemName: "person.fill.xmark").font(.system(size: 10, weight: .bold))
                 Text("не пришёл \(count)×").font(.system(size: 11, weight: .semibold))
             }
-            .foregroundStyle(Theme.danger)
+            .foregroundStyle(Theme.dangerInk)
             .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(Theme.danger.opacity(0.1), in: Capsule())
+            .background(Theme.danger.opacity(0.10), in: Capsule())
             .accessibilityLabel("Не пришёл \(count) раз")
         }
     }
@@ -308,11 +328,21 @@ struct AvatarCircle: View {
 struct StarPicker: View {
     @Binding var rating: Int
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
             ForEach(1...5, id: \.self) { i in
-                Image(systemName: i <= rating ? "star.fill" : "star")
-                    .font(.title3).foregroundStyle(i <= rating ? Theme.star : Theme.line)
-                    .onTapGesture { rating = i; Haptics.tap() }
+                Button {
+                    rating = i
+                    Haptics.tap()
+                } label: {
+                    Image(systemName: i <= rating ? "star.fill" : "star")
+                        .font(.title3)
+                        .foregroundStyle(i <= rating ? Theme.star : Theme.inkMuted)
+                        // Оценка человека не должна зависеть от точности попадания:
+                        // сама звезда 20pt, зона нажатия — норматив Apple.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -320,9 +350,9 @@ struct StarPicker: View {
         .accessibilityValue("\(rating) из 5")
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: rating = min(5, rating + 1)
-            case .decrement: rating = max(1, rating - 1)
-            @unknown default: break
+            case .increment: if rating < 5 { rating += 1 }
+            case .decrement: if rating > 1 { rating -= 1 }
+            default: break
             }
         }
     }
@@ -332,8 +362,10 @@ extension View {
     /// Бумажный фон экрана.
     func paperBackground() -> some View { background(Theme.paper.ignoresSafeArea()) }
     func cardStyle() -> some View {
-        background(Theme.surface).clipShape(RoundedRectangle(cornerRadius: Radii.card))
-            .overlay(RoundedRectangle(cornerRadius: Radii.card).stroke(Theme.line, lineWidth: 1))
+        background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: Radii.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radii.card, style: .continuous)
+                .stroke(Theme.lineStrong, lineWidth: 1))
     }
 }
 

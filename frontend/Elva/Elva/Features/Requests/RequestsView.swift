@@ -12,18 +12,22 @@ struct RequestsView: View {
     var areaHint: String?
     /// Внутри страницы ленты свой заголовок и тулбар не нужны — они уже есть сверху.
     var embedded: Bool = false
+    /// Внутри ленты «+» живёт в общей шапке, поэтому создание запускается снаружи.
+    var showCreate: Binding<Bool>? = nil
 
     @EnvironmentObject var auth: AuthManager
     @State private var items: [CompanyRequest] = []
     @State private var isLoading = true
     @State private var loadFailed = false
     @State private var errorText: String?
-    @State private var showCreate = false
+    @State private var showCreateInternal = false
     @State private var organizing: CompanyRequest?
+
+    private var createBinding: Binding<Bool> { showCreate ?? $showCreateInternal }
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: FeedLayout.cardGap) {
                 header
                 if let errorText {
                     Text(errorText).font(.footnote).foregroundStyle(Theme.danger)
@@ -38,13 +42,15 @@ struct RequestsView: View {
                         title: "Пока никто ничего не хочет",
                         subtitle: "Скажите первым, чем хотели бы заняться. Это ни к чему не обязывает — организовать может кто угодно.",
                         actionTitle: "Сказать, чего хочу",
-                        action: { showCreate = true }
+                        action: { createBinding.wrappedValue = true }
                     )
                 } else {
                     ForEach(items) { card($0) }
                 }
             }
-            .padding(16)
+            .padding(.horizontal, FeedLayout.gutter)
+            .padding(.top, FeedLayout.top)
+            .padding(.bottom, FeedLayout.bottom)
         }
         .background(Theme.paper.ignoresSafeArea())
         .navigationTitle(embedded ? "" : "Ищут компанию")
@@ -52,11 +58,11 @@ struct RequestsView: View {
         .toolbar {
             if !embedded {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showCreate = true } label: { Image(systemName: "plus") }
+                    Button { createBinding.wrappedValue = true } label: { Image(systemName: "plus") }
                 }
             }
         }
-        .sheet(isPresented: $showCreate) {
+        .sheet(isPresented: createBinding) {
             CreateRequestView(coordinate: coordinate, areaHint: areaHint) {
                 Task { await load() }
             }
@@ -90,7 +96,7 @@ struct RequestsView: View {
     private func card(_ r: CompanyRequest) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                CategoryBadge(category: r.category, compact: false)
+                CategoryBadge(category: r.category, style: .tinted)
                 Text(WhenWindow(rawValue: r.whenWindow)?.title ?? "На неделе")
                     .font(.system(size: 11, weight: .heavy)).tracking(0.3)
                     .foregroundStyle(Theme.ink2)
@@ -191,6 +197,8 @@ struct CreateRequestView: View {
     var areaHint: String?
     /// Внутри страницы ленты свой заголовок и тулбар не нужны — они уже есть сверху.
     var embedded: Bool = false
+    /// Внутри ленты «+» живёт в общей шапке, поэтому создание запускается снаружи.
+    var showCreate: Binding<Bool>? = nil
     var onCreated: () -> Void = {}
 
     @EnvironmentObject var auth: AuthManager

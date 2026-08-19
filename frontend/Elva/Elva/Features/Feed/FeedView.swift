@@ -2,6 +2,19 @@ import CoreLocation
 import MapKit
 import SwiftUI
 
+/// Единая геометрия трёх страниц ленты.
+///
+/// Шапка над ними общая, поэтому любое расхождение в полях и в старте контента
+/// читается как скачок при свайпе. Раньше поля были 18/16/16, а верхний отступ
+/// 8/0/16 — страницы дёргались на каждом переходе.
+enum FeedLayout {
+    static let gutter: CGFloat = 16    // поля экрана, совпадают с шапкой
+    static let top: CGFloat = 12       // одинаковая высота старта контента
+    static let block: CGFloat = 16     // между смысловыми блоками
+    static let cardGap: CGFloat = 12   // между карточками
+    static let bottom: CGFloat = 24    // воздух под последней карточкой
+}
+
 struct FeedView: View {
     @EnvironmentObject var auth: AuthManager
     @StateObject private var vm = FeedViewModel()
@@ -13,6 +26,11 @@ struct FeedView: View {
     @State private var showSubscriptions = false
     /// Активная страница ленты: 0 — активности, 1 — афиша, 2 — желания.
     @State private var page = 0
+    /// Афиша на карте: подгружается отдельно от событий, показывается другой меткой.
+    @State private var posterPins: [PosterItem] = []
+    @State private var selectedPoster: PosterItem?
+    @State private var showCreateRequest = false
+    @Namespace private var pageIndicator
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -27,9 +45,9 @@ struct FeedView: View {
                     // афиша и желания живут рядом, а не в закопанных разделах.
                     TabView(selection: $page) {
                         activitiesPage.tag(0)
-                        PosterFeedView(coordinate: center).tag(1)
+                        PosterFeedView(coordinate: center) { withAnimation { page = 0 } }.tag(1)
                         RequestsView(coordinate: center, areaHint: vm.manualCity?.name,
-                                     embedded: true).tag(2)
+                                     embedded: true, showCreate: $showCreateRequest).tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .animation(.easeInOut(duration: 0.2), value: page)
@@ -77,10 +95,10 @@ struct FeedView: View {
     /// Переключатель страниц. Дублирует свайп кнопками: свайп сам по себе не виден,
     /// и без подписей человек не узнает, что разделов три.
     private var pageSwitcher: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
             ForEach(Array(Self.pages.enumerated()), id: \.offset) { i, item in
                 Button {
-                    withAnimation { page = i }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { page = i }
                     Haptics.tap()
                 } label: {
                     HStack(spacing: 5) {
@@ -88,16 +106,28 @@ struct FeedView: View {
                         Text(item.title).font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundStyle(page == i ? .white : Theme.ink2)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(page == i ? Theme.ink : Theme.surface, in: Capsule())
-                    .overlay(Capsule().stroke(page == i ? .clear : Theme.line))
+                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                    .background {
+                        // Один индикатор на весь трек: движение читается как
+                        // «страница едет», а не как три независимые кнопки.
+                        if page == i {
+                            Capsule().fill(Theme.accentInk)
+                                .matchedGeometryEffect(id: "page", in: pageIndicator)
+                        }
+                    }
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(item.title)
+                .accessibilityAddTraits(page == i ? [.isSelected, .isButton] : .isButton)
             }
-            Spacer(minLength: 0)
         }
+        .padding(3)
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().stroke(Theme.lineStrong))
     }
+
+    /// Настроение страницы. Отдельно от названия вкладки: вкладка называет раздел.
+    private static let titles = ["Чем займёмся?", "Что идёт рядом", "Кто чего хочет"]
 
     private static let pages: [(title: String, icon: String)] = [
         ("Активности", "square.grid.2x2.fill"),
@@ -109,7 +139,7 @@ struct FeedView: View {
 
     private var feed: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: FeedLayout.block) {
                 searchAndChips
                 if vm.items.isEmpty && vm.isLoading {
                     VStack(spacing: 16) {
@@ -128,8 +158,9 @@ struct FeedView: View {
                         .task { if let last = vm.items.last { await vm.loadMoreIfNeeded(current: last) } }
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 8)
+            .padding(.horizontal, FeedLayout.gutter)
+            .padding(.top, FeedLayout.top)
+            .padding(.bottom, FeedLayout.bottom)
         }
         .refreshable { await vm.refresh() }
     }
@@ -148,30 +179,53 @@ struct FeedView: View {
                 }
                 .accessibilityLabel("Город: \(vm.manualCity?.name ?? "моё местоположение")")
                 .accessibilityHint("Выбрать другой город")
-                Text(Self.pages[page].title == "Активности" ? "Чем займёмся?" :
-                     (page == 1 ? "Что идёт рядом" : "Кто чего хочет"))
-                    .font(.display(30)).foregroundStyle(Theme.ink)
+                Text(Self.titles[page])
+                    .font(.display(28)).foregroundStyle(Theme.ink)
+                    // Заголовок общий для трёх страниц: перенос на вторую строку
+                    // поднимал бы весь контент под ним.
+                    .lineLimit(1).minimumScaleFactor(0.72)
+                    .frame(height: 34, alignment: .leading)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.18), value: page)
             }
             Spacer()
             HStack(spacing: 8) {
                 circleButton("bell") { showSubscriptions = true }
                     .accessibilityLabel("Подписки на события")
-                // Карта осмысленна только для активностей людей.
-                if page == 0 {
-                    circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
-                        .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
-                }
-                // Афишу заводит оператор, поэтому на её странице кнопки создания нет.
-                if page != 1 {
-                    NavigationLink { EventCreateView() } label: {
-                        Image(systemName: "plus").font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white).frame(width: 44, height: 44)
-                            .background(Theme.accent).clipShape(Circle())
-                    }
-                    .accessibilityLabel("Создать событие")
-                }
+                // Место под кнопку карты держим всегда: иначе соседние кнопки
+                // перескакивают на 44pt при каждом свайпе.
+                circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
+                    .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
+                    .opacity(page == 0 ? 1 : 0)
+                    .disabled(page != 0)
+                    .accessibilityHidden(page != 0)
+                // Афишу заводит оператор — там создавать нечего.
+                plusButton
+                    .opacity(page == 1 ? 0 : 1)
+                    .disabled(page == 1)
+                    .accessibilityHidden(page == 1)
             }
+            .animation(.easeInOut(duration: 0.18), value: page)
         }
+    }
+
+    /// «+» меняет смысл вместе со страницей. Подменять дешёвое действие дорогим
+    /// под одной иконкой нельзя: на «Хочу» человек ждёт желание, а не публикацию.
+    @ViewBuilder
+    private var plusButton: some View {
+        if page == 2 {
+            Button { showCreateRequest = true; Haptics.tap() } label: { plusIcon }
+                .accessibilityLabel("Сказать, чего хочу")
+        } else {
+            NavigationLink { EventCreateView() } label: { plusIcon }
+                .accessibilityLabel("Создать событие")
+        }
+    }
+
+    private var plusIcon: some View {
+        Image(systemName: "plus").font(.system(size: 18, weight: .bold))
+            .foregroundStyle(.white).frame(width: 44, height: 44)
+            .background(Theme.accent).clipShape(Circle())
     }
 
     private func circleButton(_ icon: String, _ action: @escaping () -> Void) -> some View {
@@ -275,22 +329,66 @@ struct FeedView: View {
                 Spacer()
                 circleButton("list.bullet") { isMap = false }
             }
-            .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 10)
+            .padding(.horizontal, 18).padding(.top, 8).padding(.bottom, 6)
+            mapLegend.padding(.horizontal, 18).padding(.bottom, 8)
             Map(position: $camera) {
                 UserAnnotation()
+                // События людей — круглые метки в цвете категории.
                 ForEach(vm.items) { item in
-                    Annotation(item.title, coordinate: CLLocationCoordinate2D(latitude: item.latitude, longitude: item.longitude)) {
+                    Annotation(item.title, coordinate: CLLocationCoordinate2D(
+                        latitude: item.latitude, longitude: item.longitude)) {
                         Button { selected = item } label: {
                             let c = Categories.of(item.category)
-                            Image(systemName: c.icon).font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                            Image(systemName: c.icon)
+                                .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
                                 .frame(width: 34, height: 34).background(c.color).clipShape(Circle())
                                 .overlay(Circle().stroke(.white, lineWidth: 2)).shadow(radius: 2)
+                        }
+                    }
+                }
+                // Афиша — квадратная метка одного цвета: это чужие мероприятия,
+                // а не чей-то сбор, и путать их на карте нельзя.
+                ForEach(posterPins) { item in
+                    Annotation(item.title, coordinate: CLLocationCoordinate2D(
+                        latitude: item.latitude, longitude: item.longitude)) {
+                        Button { selectedPoster = item } label: {
+                            Image(systemName: "ticket.fill")
+                                .font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Theme.ink, in: RoundedRectangle(cornerRadius: 9))
+                                .overlay(RoundedRectangle(cornerRadius: 9)
+                                    .stroke(.white, lineWidth: 2))
+                                .shadow(radius: 2)
                         }
                     }
                 }
             }
             .mapControls { MapUserLocationButton() }
         }
+        .task(id: isMap) { if isMap { await loadPosterPins() } }
+        .navigationDestination(item: $selectedPoster) { PosterDetailView(item: $0) }
+    }
+
+    /// Легенда: без неё две разные метки читаются как случайный разнобой.
+    private var mapLegend: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 6) {
+                Circle().fill(Theme.accent).frame(width: 12, height: 12)
+                Text("собирают люди").font(.system(size: 12)).foregroundStyle(Theme.ink2)
+            }
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 3).fill(Theme.ink).frame(width: 12, height: 12)
+                Text("афиша").font(.system(size: 12)).foregroundStyle(Theme.ink2)
+            }
+            Spacer()
+        }
+    }
+
+    private func loadPosterPins() async {
+        let resp: PosterResponse? = try? await auth.api.send(Endpoint(
+            path: "/poster",
+            query: ["lat": "\(vm.latitude)", "lng": "\(vm.longitude)", "radius_km": "50"]))
+        posterPins = resp?.items ?? []
     }
 
     private var emptyState: some View {

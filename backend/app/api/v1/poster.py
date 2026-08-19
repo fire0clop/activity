@@ -6,11 +6,11 @@
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query, status
 from geoalchemy2 import Geography
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, or_, select
 
 from app.api.v1.admin import AdminGuard
 from app.core.deps import CurrentUser, DbSession
@@ -59,7 +59,8 @@ async def list_poster(
     lng: float = Query(..., ge=-180, le=180),
     radius_km: float = Query(50, gt=0, le=500),
     category: str | None = None,
-    when: str | None = Query(None, pattern="^(today|tomorrow|weekend)$"),
+    when: str | None = Query(None, pattern="^(today|tomorrow|weekend|week)$"),
+    query: str | None = None,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = None,
 ) -> PosterOut:
@@ -83,11 +84,24 @@ async def list_poster(
     ]
     if category:
         filters.append(PosterEvent.category == category)
-    if when:
+    if when == "week":
+        filters.append(PosterEvent.starts_at < datetime.now(UTC) + timedelta(days=7))
+    elif when:
         from app.api.v1.events import _when_range
 
         w_from, w_to = _when_range(when)
         filters += [PosterEvent.starts_at >= w_from, PosterEvent.starts_at < w_to]
+    if query:
+        # Экранируем спецсимволы LIKE, чтобы «%» и «_» искались буквально.
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
+        filters.append(
+            or_(
+                PosterEvent.title.ilike(like, escape="\\"),
+                PosterEvent.venue.ilike(like, escape="\\"),
+                PosterEvent.description.ilike(like, escape="\\"),
+            )
+        )
 
     rows = (
         await db.execute(
