@@ -60,21 +60,25 @@ struct SkeletonCard: View {
     @State private var shimmer = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Rectangle().fill(Theme.line).frame(height: 150)
+        VStack(alignment: .leading, spacing: 8) {
+            Rectangle().fill(Theme.skeleton).frame(height: 150)
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 6).fill(Theme.line).frame(width: 180, height: 18)
-                RoundedRectangle(cornerRadius: 6).fill(Theme.line).frame(width: 120, height: 12)
+                RoundedRectangle(cornerRadius: 6).fill(Theme.skeleton).frame(width: 180, height: 18)
+                RoundedRectangle(cornerRadius: 6).fill(Theme.skeleton).frame(width: 120, height: 12)
             }
-            .padding(14)
+            .padding(16)
         }
+        // Мерцает содержимое, а карточка стоит на месте: иначе загрузка читается
+        // как пустой экран, который то появляется, то исчезает.
+        .opacity(shimmer ? 0.45 : 1)
         .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Radii.card))
-        .overlay(RoundedRectangle(cornerRadius: Radii.card).stroke(Theme.line))
-        .opacity(shimmer ? 0.5 : 1)
+        .clipShape(RoundedRectangle(cornerRadius: Radii.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radii.card, style: .continuous)
+            .stroke(Theme.lineStrong, lineWidth: 1))
         .onAppear {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { shimmer = true }
         }
+        .accessibilityHidden(true)
     }
 }
 

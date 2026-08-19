@@ -112,11 +112,19 @@ struct ConnectionsView: View {
     }
 
     private func meetingsLine(_ c: Connection) -> String {
-        let times = switch c.meetings {
+        let times: String = switch c.meetings {
         case 1: "виделись однажды"
-        default: "виделись \(c.meetings) раза"
+        case 2: "виделись дважды"
+        default: "виделись \(c.meetings) \(Self.timesWord(c.meetings))"
         }
         return "\(times) · «\(c.lastEventTitle)»"
+    }
+
+    /// Русское склонение: «5 раз», но «22 раза».
+    private static func timesWord(_ n: Int) -> String {
+        let ten = n % 100, one = n % 10
+        if (11...14).contains(ten) { return "раз" }
+        return (2...4).contains(one) ? "раза" : "раз"
     }
 
     private func load() async {

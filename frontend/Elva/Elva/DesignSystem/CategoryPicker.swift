@@ -12,6 +12,9 @@ struct CategoryPicker: View {
     @State private var showAll = false
 
     var body: some View {
+        // Высота задана явно: без неё горизонтальный список внутри вертикального
+        // разворачивается на всю доступную высоту и перехватывает нажатия у карточек,
+        // которые лежат ниже.
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 // Своя категория, уже выбранная, должна остаться на виду.
@@ -25,20 +28,30 @@ struct CategoryPicker: View {
                             Image(systemName: "ellipsis").font(.system(size: 11, weight: .bold))
                             Text("Ещё").font(.system(size: 13, weight: .semibold))
                         }
-                        .foregroundStyle(Theme.ink)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(Theme.secondaryBg, in: Capsule())
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.horizontal, 14).padding(.vertical, 9)
+                        .background(Theme.surface, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.lineStrong))
+                        .contentShape(Capsule())
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.horizontal, 1).padding(.vertical, 3)
         }
+        .frame(height: CategoryPicker.rowHeight)
         .sheet(isPresented: $showAll) {
             AllCategoriesView(selection: $selection)
         }
     }
 
+    static let rowHeight: CGFloat = 52
+
+    /// Чип живёт в цвете своей категории: невыбранный — мягкая заливка и цветная
+    /// иконка, выбранный — полная заливка. Серые чипы на бумажном фоне выглядели
+    /// выключенными, будто выбирать нечего.
     private func chip(_ key: String) -> some View {
         let c = Categories.of(key)
         let selected = selection == key
@@ -46,15 +59,27 @@ struct CategoryPicker: View {
             selection = selected ? "" : key
             Haptics.tap()
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: c.icon).font(.system(size: 11, weight: .bold))
-                Text(c.title).font(.system(size: 13, weight: .semibold))
+            HStack(spacing: 6) {
+                Image(systemName: c.icon)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(selected ? .white : c.color)
+                Text(c.title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(selected ? .white : Theme.ink)
+                    .lineLimit(1)
             }
-            .foregroundStyle(selected ? .white : Theme.ink)
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(selected ? c.color : Theme.secondaryBg, in: Capsule())
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(selected ? c.color : c.tint, in: Capsule())
+            .overlay(Capsule().stroke(selected ? .clear : c.color.opacity(0.30), lineWidth: 1))
+            .shadow(color: selected ? c.color.opacity(0.30) : .clear, radius: 8, y: 3)
+            .contentShape(Capsule())
+            // Невидимый воротник до норматива Apple: плашка остаётся низкой,
+            // а промахнуться по ней нельзя.
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.15), value: selected)
     }
 }
 
@@ -144,23 +169,27 @@ struct AllCategoriesView: View {
             dismiss()
         } label: {
             HStack(spacing: 8) {
+                // Цвет дозирован: тридцать заливок были бы пёстро, тридцать цветных
+                // точек — живо.
                 Image(systemName: c.icon).font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(selected ? .white : c.color).frame(width: 20)
+                    .foregroundStyle(selected ? .white : c.color)
+                    .frame(width: 26, height: 26)
+                    .background(selected ? Color.white.opacity(0.22) : c.tint, in: Circle())
                 Text(c.title).font(.system(size: 14, weight: .medium))
                     .foregroundStyle(selected ? .white : Theme.ink)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if let subtitle {
                     Text(subtitle).font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(selected ? .white.opacity(0.8) : Theme.ink2)
+                        .foregroundStyle(selected ? .white.opacity(0.85) : Theme.ink2)
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .background(selected ? c.color : Theme.surface,
-                        in: RoundedRectangle(cornerRadius: Radii.sm))
-            .overlay(RoundedRectangle(cornerRadius: Radii.sm)
-                .stroke(selected ? .clear : Theme.line))
+                        in: RoundedRectangle(cornerRadius: Radii.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radii.sm, style: .continuous)
+                .stroke(selected ? .clear : c.color.opacity(0.22), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

@@ -23,7 +23,7 @@ struct EventDetailView: View {
             if let event {
                 ScrollView(showsIndicators: false) { content(event) }
                     .ignoresSafeArea(edges: .top)
-                stickyBar(event)
+                    .safeAreaInset(edge: .bottom, spacing: 0) { stickyBar(event) }
             } else if isLoading {
                 ProgressView().tint(Theme.accent)
             } else {
@@ -69,7 +69,6 @@ struct EventDetailView: View {
                 if let d = e.description, !d.isEmpty {
                     Text(d).font(.system(size: 16)).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(3)
                 }
-                if let errorText { Text(errorText).font(.footnote).foregroundStyle(.red) }
                 if let reportStatus { Text(reportStatus).font(.footnote).foregroundStyle(Theme.ink2) }
                 if e.status == "finished", e.isOrganizer || e.myParticipation?.status == "accepted" {
                     NavigationLink { ReviewView(event: e) } label: {
@@ -90,7 +89,6 @@ struct EventDetailView: View {
                             .foregroundStyle(Theme.accentInk)
                     }
                 }
-                Color.clear.frame(height: 120)  // запас под sticky-CTA, чтобы контент не прятался
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -247,6 +245,12 @@ struct EventDetailView: View {
     private func stickyBar(_ e: EventDetail) -> some View {
         VStack(spacing: 0) {
             Divider().background(Theme.line)
+            // Ошибка живёт у кнопки, которая её вызвала, а не двумя экранами выше.
+            if let errorText {
+                Text(errorText).font(.footnote).foregroundStyle(Theme.dangerInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8).padding(.horizontal, 20)
+            }
             if let inviteResult {
                 Text(inviteResult).font(.footnote).foregroundStyle(Theme.ink2)
                     .padding(.top, 8).padding(.horizontal, 20)
@@ -273,11 +277,13 @@ struct EventDetailView: View {
                                 .font(.system(size: 13)).foregroundStyle(Theme.ink2)
                             HStack(spacing: 10) {
                                 Button { Task { await join() } } label: {
-                                    ctaLabel(actionLoading ? "…" : "Иду", filled: true)
+                                    ctaLabel("Иду", filled: true, loading: actionLoading)
                                 }
+                                .disabled(actionLoading)
                                 Button { Task { await leave() } } label: {
                                     ctaLabel("Не смогу", filled: false)
                                 }
+                                .disabled(actionLoading)
                             }
                         }
                     case .accepted:
@@ -292,7 +298,10 @@ struct EventDetailView: View {
                     case .rejected, .cancelled, .unknown:
                         // Отклонённый/отменивший может откликнуться снова (бэк это допускает);
                         // .unknown (нет заявки или новый статус) — тоже показываем отклик.
-                        Button { Task { await join() } } label: { ctaLabel(actionLoading ? "…" : "Откликнуться", filled: true) }
+                        Button { Task { await join() } } label: {
+                            ctaLabel("Откликнуться", filled: true, loading: actionLoading)
+                        }
+                        .disabled(actionLoading)
                     }
                 }
             }
@@ -304,8 +313,11 @@ struct EventDetailView: View {
         .shadow(color: Theme.ink.opacity(0.08), radius: 8, y: -3)
     }
 
-    private func ctaLabel(_ title: String, filled: Bool) -> some View {
-        Text(title).font(.system(size: 17, weight: .bold))
+    private func ctaLabel(_ title: String, filled: Bool, loading: Bool = false) -> some View {
+        ZStack {
+            if loading { ProgressView().tint(filled ? .white : Theme.ink2) }
+            else { Text(title).font(.system(size: 17, weight: .bold)) }
+        }
             .frame(maxWidth: .infinity, minHeight: 54)
             .background(filled ? Theme.accent : Theme.surface)
             .foregroundStyle(filled ? .white : Theme.ink2)

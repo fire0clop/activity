@@ -9,57 +9,155 @@ import SwiftUI
 /// компанию — так чужое мероприятие втягивается в основной цикл продукта.
 struct PosterFeedView: View {
     let coordinate: CLLocationCoordinate2D
+    /// Переход на страницу активностей: пустая афиша не должна быть тупиком.
+    var onGoToActivities: () -> Void = {}
 
     @EnvironmentObject var auth: AuthManager
     @State private var items: [PosterItem] = []
     @State private var category = ""
+    @State private var query = ""
+    /// nil — без ограничения по датам.
+    @State private var when: String?
     @State private var isLoading = true
     @State private var loadFailed = false
     @State private var selected: PosterItem?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 14) {
-                CategoryPicker(selection: $category)
-                    .padding(.bottom, 2)
+            LazyVStack(spacing: FeedLayout.block) {
+                // Фильтры — один смысловой блок, внутри плотнее, чем между блоками.
+                VStack(spacing: FeedLayout.cardGap) {
+                    searchField
+                    whenChips
+                    CategoryPicker(selection: $category)
+                }
 
                 if isLoading && items.isEmpty {
                     ForEach(0..<3, id: \.self) { _ in SkeletonCard() }
                 } else if loadFailed {
                     ErrorState { Task { await load() } }
                 } else if items.isEmpty {
-                    EmptyState(
-                        icon: "ticket",
-                        title: category.isEmpty ? "Афиша пока пустая" : "В этой категории пусто",
-                        subtitle: category.isEmpty
-                            ? "Здесь будут концерты, выставки и фестивали поблизости."
-                            : "Попробуйте другую категорию."
-                    )
+                    emptyState
                 } else {
-                    ForEach(items) { card($0) }
+                    LazyVStack(spacing: FeedLayout.cardGap) {
+                        ForEach(items) { card($0) }
+                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(.horizontal, FeedLayout.gutter)
+            .padding(.top, FeedLayout.top)
+            .padding(.bottom, FeedLayout.bottom)
         }
         .task { await load() }
         .refreshable { await load() }
         .onChange(of: category) { Task { await load() } }
+        .onChange(of: when) { Task { await load() } }
+        .onSubmit { Task { await load() } }
         .navigationDestination(item: $selected) { PosterDetailView(item: $0) }
     }
+
+    @ViewBuilder
+    private var emptyState: some View {
+        if hasFilters {
+            EmptyState(
+                icon: "line.3.horizontal.decrease.circle",
+                title: "Ничего не нашлось",
+                subtitle: "Слишком узкий срез — снимите фильтры и посмотрите всё, что идёт рядом.",
+                actionTitle: "Сбросить фильтры",
+                action: {
+                    category = ""; when = nil; query = ""
+                    Haptics.tap(); Task { await load() }
+                }
+            )
+        } else {
+            EmptyState(
+                icon: "ticket",
+                title: "Афиша пока пустая",
+                subtitle: "Здесь будут концерты, выставки и фестивали поблизости. А пока посмотрите, что собирают люди.",
+                actionTitle: "К активностям",
+                action: { Haptics.tap(); onGoToActivities() }
+            )
+        }
+    }
+
+    private var hasFilters: Bool {
+        !category.isEmpty || when != nil
+            || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
+            TextField("Концерт, выставка, площадка…", text: $query)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                    Task { await load() }
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.ink2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 11)
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().stroke(Theme.line))
+    }
+
+    /// Даты: те же срезы, что и в ленте активностей, плюс «на неделе» —
+    /// у афиши горизонт планирования длиннее, чем у спонтанной встречи.
+    private var whenChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Self.whenOptions, id: \.value) { option in
+                    let active = when == option.value
+                    Button {
+                        when = active ? nil : option.value
+                        Haptics.tap()
+                    } label: {
+                        Text(option.title)
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(active ? .white : Theme.ink)
+                            .padding(.horizontal, 14).padding(.vertical, 9)
+                            .background(active ? Theme.ink : Theme.surface, in: Capsule())
+                            .overlay(Capsule().stroke(active ? .clear : Theme.line))
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1).padding(.vertical, 3)
+        }
+        .frame(height: CategoryPicker.rowHeight)
+    }
+
+    private static let whenOptions: [(title: String, value: String)] = [
+        ("Сегодня", "today"), ("Завтра", "tomorrow"),
+        ("Выходные", "weekend"), ("На неделе", "week"),
+    ]
 
     private func card(_ p: PosterItem) -> some View {
         Button { selected = p } label: {
             VStack(alignment: .leading, spacing: 0) {
-                if let url = p.imageURL, let u = URL(string: url) {
-                    AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Theme.secondaryBg }
-                        .frame(height: 150).frame(maxWidth: .infinity).clipped()
+                // Запасная обложка обязательна: смешанный список из карточек с фото
+                // и без него рвёт ритм сильнее любого отступа.
+                Group {
+                    if let url = p.imageURL, let u = URL(string: url) {
+                        AsyncImage(url: u) { $0.resizable().scaledToFill() }
+                            placeholder: { CategoryCover(category: p.category) }
+                    } else {
+                        CategoryCover(category: p.category)
+                    }
                 }
+                .frame(height: 150).frame(maxWidth: .infinity).clipped()
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        CategoryBadge(category: p.category, compact: true)
+                        CategoryBadge(category: p.category, style: .tinted)
                         Text(DateFormat.prettyDay(String(p.startsAt.prefix(10))))
-                            .font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.accentInk)
+                            .font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.ink)
+                            .lineLimit(1)
                         Spacer()
                         if let d = p.distanceKm {
                             Text(String(format: "%.0f км", d))
@@ -101,12 +199,15 @@ struct PosterFeedView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        var query = ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
-                     "radius_km": "50"]
-        if !category.isEmpty { query["category"] = category }
+        var params = ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
+                      "radius_km": "50"]
+        if !category.isEmpty { params["category"] = category }
+        if let when { params["when"] = when }
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty { params["query"] = text }
         do {
             let resp: PosterResponse = try await auth.api.send(
-                Endpoint(path: "/poster", query: query))
+                Endpoint(path: "/poster", query: params))
             items = resp.items
             loadFailed = false
         } catch {
