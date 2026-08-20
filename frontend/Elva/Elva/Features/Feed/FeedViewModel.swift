@@ -18,7 +18,9 @@ final class FeedViewModel: ObservableObject {
     @Published private(set) var suggestedCount: Int?
 
     // Фильтры
-    @Published var when: String?        // nil | today | tomorrow | weekend
+    @Published var when: String?        // nil | today | tomorrow | weekend | week
+    @Published var category: String = ""
+    @Published var freeOnly = false
     @Published var query: String = ""
     @Published var radiusKm: Double = 30
 
@@ -71,6 +73,14 @@ final class FeedViewModel: ObservableObject {
         Task { await refresh() }
     }
 
+    /// Применить набор фильтров из общего окна. Перезагрузку инициирует вызывающий:
+    /// экран знает, когда окно закрылось, а модель — нет.
+    func setFilters(category: String, when: String?, freeOnly: Bool) {
+        self.category = category
+        self.when = when
+        self.freeOnly = freeOnly
+    }
+
     /// Холодный старт: расширить радиус до подсказанного и перезагрузить.
     func expandRadius() {
         guard let suggested = suggestedRadiusKm else { return }
@@ -101,6 +111,8 @@ final class FeedViewModel: ObservableObject {
                     "lng": String(longitude),
                     "radius_km": String(radiusKm),
                     "when": when,
+                    "category": category.isEmpty ? nil : category,
+                    "free_only": freeOnly ? "true" : nil,
                     "query": trimmedQuery.isEmpty ? nil : trimmedQuery,
                     "limit": "20",
                     "cursor": reset ? nil : nextCursor,

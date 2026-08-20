@@ -14,10 +14,9 @@ struct PosterFeedView: View {
 
     @EnvironmentObject var auth: AuthManager
     @State private var items: [PosterItem] = []
-    @State private var category = ""
+    @State private var filters = FeedFilters()
     @State private var query = ""
-    /// nil — без ограничения по датам.
-    @State private var when: String?
+    @State private var showFilters = false
     @State private var isLoading = true
     @State private var loadFailed = false
     @State private var selected: PosterItem?
@@ -28,8 +27,23 @@ struct PosterFeedView: View {
                 // Фильтры — один смысловой блок, внутри плотнее, чем между блоками.
                 VStack(spacing: FeedLayout.cardGap) {
                     searchField
-                    whenChips
-                    CategoryPicker(selection: $category)
+                    HStack(spacing: 8) {
+                        FiltersButton(filters: filters) { showFilters = true }
+                        if !filters.isEmpty {
+                            Button {
+                                filters.reset(); Haptics.tap()
+                                Task { await load() }
+                            } label: {
+                                Text("Сбросить").font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Theme.ink2)
+                                    .padding(.horizontal, 14).padding(.vertical, 11)
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer(minLength: 0)
+                    }
                 }
 
                 if isLoading && items.isEmpty {
@@ -50,9 +64,10 @@ struct PosterFeedView: View {
         }
         .task { await load() }
         .refreshable { await load() }
-        .onChange(of: category) { Task { await load() } }
-        .onChange(of: when) { Task { await load() } }
         .onSubmit { Task { await load() } }
+        .sheet(isPresented: $showFilters) {
+            FiltersSheet(filters: $filters) { Task { await load() } }
+        }
         .navigationDestination(item: $selected) { PosterDetailView(item: $0) }
     }
 
@@ -65,7 +80,7 @@ struct PosterFeedView: View {
                 subtitle: "Слишком узкий срез — снимите фильтры и посмотрите всё, что идёт рядом.",
                 actionTitle: "Сбросить фильтры",
                 action: {
-                    category = ""; when = nil; query = ""
+                    filters.reset(); query = ""
                     Haptics.tap(); Task { await load() }
                 }
             )
@@ -81,8 +96,7 @@ struct PosterFeedView: View {
     }
 
     private var hasFilters: Bool {
-        !category.isEmpty || when != nil
-            || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !filters.isEmpty || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var searchField: some View {
@@ -105,38 +119,6 @@ struct PosterFeedView: View {
         .background(Theme.surface, in: Capsule())
         .overlay(Capsule().stroke(Theme.line))
     }
-
-    /// Даты: те же срезы, что и в ленте активностей, плюс «на неделе» —
-    /// у афиши горизонт планирования длиннее, чем у спонтанной встречи.
-    private var whenChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Self.whenOptions, id: \.value) { option in
-                    let active = when == option.value
-                    Button {
-                        when = active ? nil : option.value
-                        Haptics.tap()
-                    } label: {
-                        Text(option.title)
-                            .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundStyle(active ? .white : Theme.ink)
-                            .padding(.horizontal, 14).padding(.vertical, 9)
-                            .background(active ? Theme.ink : Theme.surface, in: Capsule())
-                            .overlay(Capsule().stroke(active ? .clear : Theme.line))
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 1).padding(.vertical, 3)
-        }
-        .frame(height: CategoryPicker.rowHeight)
-    }
-
-    private static let whenOptions: [(title: String, value: String)] = [
-        ("Сегодня", "today"), ("Завтра", "tomorrow"),
-        ("Выходные", "weekend"), ("На неделе", "week"),
-    ]
 
     private func card(_ p: PosterItem) -> some View {
         Button { selected = p } label: {
@@ -201,8 +183,9 @@ struct PosterFeedView: View {
         defer { isLoading = false }
         var params = ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
                       "radius_km": "50"]
-        if !category.isEmpty { params["category"] = category }
-        if let when { params["when"] = when }
+        if !filters.category.isEmpty { params["category"] = filters.category }
+        if let when = filters.when { params["when"] = when }
+        if filters.freeOnly { params["free_only"] = "true" }
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty { params["query"] = text }
         do {
