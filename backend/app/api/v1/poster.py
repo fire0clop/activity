@@ -61,6 +61,7 @@ async def list_poster(
     category: str | None = None,
     when: str | None = Query(None, pattern="^(today|tomorrow|weekend|week)$"),
     query: str | None = None,
+    free_only: bool = False,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = None,
 ) -> PosterOut:
@@ -84,6 +85,8 @@ async def list_poster(
     ]
     if category:
         filters.append(PosterEvent.category == category)
+    if free_only:
+        filters.append(PosterEvent.is_free.is_(True))
     if when == "week":
         filters.append(PosterEvent.starts_at < datetime.now(UTC) + timedelta(days=7))
     elif when:

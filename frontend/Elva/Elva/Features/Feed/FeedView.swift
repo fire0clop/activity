@@ -30,6 +30,8 @@ struct FeedView: View {
     @State private var posterPins: [PosterItem] = []
     @State private var selectedPoster: PosterItem?
     @State private var showCreateRequest = false
+    @State private var filters = FeedFilters()
+    @State private var showFilters = false
     @Namespace private var pageIndicator
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
@@ -45,7 +47,7 @@ struct FeedView: View {
                     // афиша и желания живут рядом, а не в закопанных разделах.
                     TabView(selection: $page) {
                         activitiesPage.tag(0)
-                        PosterFeedView(coordinate: center) { withAnimation { page = 0 } }.tag(1)
+                        posterPage.tag(1)
                         RequestsView(coordinate: center, areaHint: vm.manualCity?.name,
                                      embedded: true, showCreate: $showCreateRequest).tag(2)
                     }
@@ -72,6 +74,9 @@ struct FeedView: View {
                 SubscriptionsView(latitude: vm.latitude, longitude: vm.longitude,
                                   locationName: vm.manualCity?.name ?? "моя точка")
             }
+            .sheet(isPresented: $showFilters) {
+                FiltersSheet(filters: $filters) { applyFilters() }
+            }
             .sheet(isPresented: $showCityPicker) {
                 CityPickerView(selected: vm.manualCity, locationDenied: location.denied) { city in
                     vm.selectCity(city)
@@ -86,10 +91,18 @@ struct FeedView: View {
         CLLocationCoordinate2D(latitude: vm.latitude, longitude: vm.longitude)
     }
 
-    /// Первая страница — то, что собирают сами люди. Карта относится только к ней.
+    /// Карта общая для двух первых страниц: на ней и события людей, и афиша,
+    /// поэтому переключатель списка/карты работает с обеих.
     @ViewBuilder
     private var activitiesPage: some View {
         if isMap { mapView } else { feed }
+    }
+
+    @ViewBuilder
+    private var posterPage: some View {
+        if isMap { mapView } else {
+            PosterFeedView(coordinate: center) { withAnimation { page = 0 } }
+        }
     }
 
     /// Переключатель страниц. Дублирует свайп кнопками: свайп сам по себе не виден,
@@ -196,9 +209,9 @@ struct FeedView: View {
                 // перескакивают на 44pt при каждом свайпе.
                 circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
                     .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
-                    .opacity(page == 0 ? 1 : 0)
-                    .disabled(page != 0)
-                    .accessibilityHidden(page != 0)
+                    .opacity(page == 2 ? 0 : 1)
+                    .disabled(page == 2)
+                    .accessibilityHidden(page == 2)
                 // Афишу заводит оператор — там создавать нечего.
                 plusButton
                     .opacity(page == 1 ? 0 : 1)
@@ -237,34 +250,48 @@ struct FeedView: View {
     }
 
     private var searchAndChips: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: FeedLayout.cardGap) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
                 TextField("Гидроциклы, теннис, концерт…", text: $vm.query)
                     .autocorrectionDisabled().onSubmit { Task { await vm.refresh() } }
+                if !vm.query.isEmpty {
+                    Button {
+                        vm.query = ""
+                        Task { await vm.refresh() }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.ink2)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
             .background(Theme.surface).clipShape(Capsule())
-            .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
+            .overlay(Capsule().stroke(Theme.lineStrong, lineWidth: 1))
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    chip("Сегодня", "today"); chip("Завтра", "tomorrow"); chip("Выходные", "weekend")
+            HStack(spacing: 8) {
+                FiltersButton(filters: filters) { showFilters = true }
+                if !filters.isEmpty {
+                    Button {
+                        filters.reset(); Haptics.tap()
+                        applyFilters()
+                    } label: {
+                        Text("Сбросить").font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.ink2)
+                            .padding(.horizontal, 14).padding(.vertical, 11)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
+                Spacer(minLength: 0)
             }
         }
     }
 
-    private func chip(_ title: String, _ value: String) -> some View {
-        let active = vm.when == value
-        return Button { vm.setWhen(value) } label: {
-            Text(title).font(.system(size: 14, weight: .bold))
-                .padding(.horizontal, 16).padding(.vertical, 9)
-                .background(active ? Theme.ink : Theme.surface)
-                .foregroundStyle(active ? Color.white : Theme.ink)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(active ? Color.clear : Theme.line, lineWidth: 1))
-        }
+    private func applyFilters() {
+        vm.setFilters(category: filters.category, when: filters.when, freeOnly: filters.freeOnly)
+        Task { await vm.refresh() }
     }
 
     // MARK: - Sections (bento: 1 крупная + сетка)

@@ -170,6 +170,7 @@ async def list_events(
     date_to: datetime | None = Query(None, alias="to"),
     category: str | None = None,
     query: str | None = None,
+    free_only: bool = False,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = None,
 ) -> EventListOut:
@@ -205,6 +206,9 @@ async def list_events(
         filters.append(Event.starts_at < date_to)
     if category:
         filters.append(Event.category == category)
+    if free_only:
+        # Бесплатно — это способ оплаты, а не нулевая цена: «с каждого по 0» не бывает.
+        filters.append(Event.price_split == "free")
     if query:
         # Экранируем спецсимволы LIKE, чтобы '%' и '_' в запросе искались буквально.
         escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
