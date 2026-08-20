@@ -151,31 +151,44 @@ struct FeedView: View {
     // MARK: - Feed (bento)
 
     private var feed: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(alignment: .leading, spacing: FeedLayout.block) {
-                searchAndChips
-                if vm.items.isEmpty && vm.isLoading {
-                    VStack(spacing: 16) {
-                        ForEach(0..<3, id: \.self) { _ in SkeletonCard() }
+        // Поиск и фильтры — над прокруткой, а не внутри неё. Внутри они
+        // перекладывались вместе с карточками при каждом обновлении списка, и
+        // нажатие, пришедшее в этот момент, засчитывалось по старой геометрии:
+        // вместо кнопки открывалась карточка, оказавшаяся на её месте.
+        VStack(spacing: 0) {
+            searchAndChips
+                .padding(.horizontal, FeedLayout.gutter)
+                .padding(.top, FeedLayout.top)
+                .padding(.bottom, FeedLayout.cardGap)
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: FeedLayout.block) {
+                    if vm.items.isEmpty && vm.isLoading {
+                        VStack(spacing: FeedLayout.block) {
+                            ForEach(0..<3, id: \.self) { _ in SkeletonCard() }
+                        }
+                    } else if let err = vm.errorText, vm.items.isEmpty {
+                        ErrorState(subtitle: err) { Task { await vm.refresh() } }
+                    } else if vm.items.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(sections, id: \.title) { section in
+                            sectionView(section)
+                        }
+                        Color.clear.frame(height: 8)
+                            .task {
+                                if let last = vm.items.last {
+                                    await vm.loadMoreIfNeeded(current: last)
+                                }
+                            }
                     }
-                    .padding(.top, 4)
-                } else if let err = vm.errorText, vm.items.isEmpty {
-                    ErrorState(subtitle: err) { Task { await vm.refresh() } }
-                } else if vm.items.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(sections, id: \.title) { section in
-                        sectionView(section)
-                    }
-                    Color.clear.frame(height: 8)
-                        .task { if let last = vm.items.last { await vm.loadMoreIfNeeded(current: last) } }
                 }
+                .padding(.horizontal, FeedLayout.gutter)
+                .padding(.top, FeedLayout.top)
+                .padding(.bottom, FeedLayout.bottom)
             }
-            .padding(.horizontal, FeedLayout.gutter)
-            .padding(.top, FeedLayout.top)
-            .padding(.bottom, FeedLayout.bottom)
+            .refreshable { await vm.refresh() }
         }
-        .refreshable { await vm.refresh() }
     }
 
     private var header: some View {

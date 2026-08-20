@@ -22,53 +22,62 @@ struct PosterFeedView: View {
     @State private var selected: PosterItem?
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: FeedLayout.block) {
-                // Фильтры — один смысловой блок, внутри плотнее, чем между блоками.
-                VStack(spacing: FeedLayout.cardGap) {
-                    searchField
-                    HStack(spacing: 8) {
-                        FiltersButton(filters: filters) { showFilters = true }
-                        if !filters.isEmpty {
-                            Button {
-                                filters.reset(); Haptics.tap()
-                                Task { await load() }
-                            } label: {
-                                Text("Сбросить").font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Theme.ink2)
-                                    .padding(.horizontal, 14).padding(.vertical, 11)
-                                    .frame(minHeight: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                }
-
-                if isLoading && items.isEmpty {
-                    ForEach(0..<3, id: \.self) { _ in SkeletonCard() }
-                } else if loadFailed {
-                    ErrorState { Task { await load() } }
-                } else if items.isEmpty {
-                    emptyState
-                } else {
-                    LazyVStack(spacing: FeedLayout.cardGap) {
+        // Фильтры живут НАД прокруткой, а не внутри неё. Внутри они перекладывались
+        // вместе с карточками при каждом обновлении списка, и нажатие, пришедшее в
+        // этот момент, засчитывалось по старой геометрии — открывалась первая
+        // карточка вместо кнопки. Заодно фильтры остаются под рукой при прокрутке.
+        VStack(spacing: 0) {
+            filterBar
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: FeedLayout.cardGap) {
+                    if isLoading && items.isEmpty {
+                        ForEach(0..<3, id: \.self) { _ in SkeletonCard() }
+                    } else if loadFailed {
+                        ErrorState { Task { await load() } }
+                    } else if items.isEmpty {
+                        emptyState
+                    } else {
                         ForEach(items) { card($0) }
                     }
                 }
+                .padding(.horizontal, FeedLayout.gutter)
+                .padding(.top, FeedLayout.top)
+                .padding(.bottom, FeedLayout.bottom)
             }
-            .padding(.horizontal, FeedLayout.gutter)
-            .padding(.top, FeedLayout.top)
-            .padding(.bottom, FeedLayout.bottom)
+            .refreshable { await load() }
         }
         .task { await load() }
-        .refreshable { await load() }
         .onSubmit { Task { await load() } }
         .sheet(isPresented: $showFilters) {
             FiltersSheet(filters: $filters) { Task { await load() } }
         }
         .navigationDestination(item: $selected) { PosterDetailView(item: $0) }
+    }
+
+    private var filterBar: some View {
+        VStack(spacing: FeedLayout.cardGap) {
+            searchField
+            HStack(spacing: 8) {
+                FiltersButton(filters: filters) { showFilters = true }
+                if !filters.isEmpty {
+                    Button {
+                        filters.reset(); Haptics.tap()
+                        Task { await load() }
+                    } label: {
+                        Text("Сбросить").font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.ink2)
+                            .padding(.horizontal, 14).padding(.vertical, 11)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, FeedLayout.gutter)
+        .padding(.top, FeedLayout.top)
+        .padding(.bottom, FeedLayout.cardGap)
     }
 
     @ViewBuilder
