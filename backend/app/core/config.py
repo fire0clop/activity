@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     # Универсальные ссылки: домен, с которого раздаётся apple-app-site-association,
     # должен совпадать с доменом ссылок вида https://<share_host>/e/<id>.
     share_host: str = "event-serv.ru"
-    app_store_url: str = "https://apps.apple.com/app/id0000000000"
+    app_store_url: str = "https://apps.apple.com/app/id6804195247"
 
     @property
     def apple_team_id(self) -> str:
