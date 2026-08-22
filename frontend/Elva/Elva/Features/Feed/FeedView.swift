@@ -405,7 +405,10 @@ struct FeedView: View {
             }
             .mapControls { MapUserLocationButton() }
         }
-        .task(id: isMap) { if isMap { await loadPosterPins() } }
+        // Ключ включает точку: при смене города метки перезагружаются сами.
+        .task(id: "\(isMap)-\(vm.latitude),\(vm.longitude)") {
+            if isMap { await loadPosterPins() }
+        }
         .navigationDestination(item: $selectedPoster) { PosterDetailView(item: $0) }
     }
 
@@ -586,14 +589,7 @@ private struct WideEventCard: View {
 
 @ViewBuilder
 private func cover(_ item: EventListItem, height: CGFloat) -> some View {
-    Group {
-        if let first = item.images.first, let url = URL(string: first) {
-            AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { CategoryCover(category: item.category) }
-        } else {
-            CategoryCover(category: item.category)
-        }
-    }
-    .frame(height: height).frame(maxWidth: .infinity).clipped()
+    CoverImage(url: item.images.first, category: item.category, height: height)
 }
 
 private func meta(_ icon: String, _ text: String) -> some View {

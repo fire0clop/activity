@@ -107,8 +107,7 @@ struct EventDetailView: View {
                 if !e.images.isEmpty {
                     TabView(selection: $photoPage) {
                         ForEach(Array(e.images.enumerated()), id: \.offset) { i, url in
-                            AsyncImage(url: URL(string: url)) { $0.resizable().scaledToFill() } placeholder: { CategoryCover(category: e.category) }
-                                .tag(i).clipped()
+                            CoverImage(url: url, category: e.category, height: 320).tag(i)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: e.images.count > 1 ? .always : .never))

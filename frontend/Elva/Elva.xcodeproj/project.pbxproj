@@ -25,6 +25,7 @@
 		370FBC2E8951E611C98EBB1D /* PosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FDECC69465E4AA9B4CAC0DF /* PosterView.swift */; };
 		3A0C1FF94EFCFD51108E3C2C /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8C4D97118ABC47815C880B4 /* TokenStore.swift */; };
 		3AB2FBA94CFD83EA6E967ADD /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8944DEFF85E671450E8A01C6 /* Theme.swift */; };
+		3D25994409EEFD8878BD0560 /* CoverImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B38243CAE8A2999E64EE57 /* CoverImage.swift */; };
 		3EA66128EDB6DFFA01A9B2A1 /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCDBF3B6FDC8207A555E726 /* Device.swift */; };
 		4161047730CFCA77AFF7ADDD /* ConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D97BA1BB71DB6032AAE7A3 /* ConnectionsView.swift */; };
 		4325439CCE3E6588A399F8D2 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DAB30FFA79FDA4B5AAC9890 /* AppDelegate.swift */; };
@@ -100,7 +101,7 @@
 		30E8BB0B9C53C928E677A30D /* CreateGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupView.swift; sourceTree = "<group>"; };
 		33069EE2726C7C4A6387FE57 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		37D97BA1BB71DB6032AAE7A3 /* ConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsView.swift; sourceTree = "<group>"; };
-		485CFB2D796B748C7AC9379A /* Elva.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Elva.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		485CFB2D796B748C7AC9379A /* Elva.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Elva.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B83584E41927800305F1B63 /* Review.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Review.swift; sourceTree = "<group>"; };
 		4C6260EB089CC20A8FCE7B3B /* ParticipationStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipationStatusTests.swift; sourceTree = "<group>"; };
 		4DAB30FFA79FDA4B5AAC9890 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -150,6 +151,7 @@
 		D89313267B48B679C3C351C0 /* Endpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoint.swift; sourceTree = "<group>"; };
 		F3EB616829AFA6F34FD371FD /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
 		F4FF7AE8406FDD767B72BC30 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
+		F7B38243CAE8A2999E64EE57 /* CoverImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverImage.swift; sourceTree = "<group>"; };
 		FD36FC02339E6F93CD2D9A7B /* GroupInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupInfoView.swift; sourceTree = "<group>"; };
 		FFB0CE923767F560C96B266D /* PasswordResetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -175,6 +177,7 @@
 			isa = PBXGroup;
 			children = (
 				5E309BEC1603AECD54EFC5DE /* CategoryPicker.swift */,
+				F7B38243CAE8A2999E64EE57 /* CoverImage.swift */,
 				CAB05F211A7D498FCE1D93CE /* FiltersSheet.swift */,
 				BEDCC1EF9BDB1C783FE18EFB /* FullScreenPhotoView.swift */,
 				99E02364BF4647D4BE764B15 /* StateViews.swift */,
@@ -570,6 +573,7 @@
 				C9D52C37309B08DB46F9FA7B /* CityPickerView.swift in Sources */,
 				B9CD4AB39608E8BB0673F14B /* CompanyRequest.swift in Sources */,
 				4161047730CFCA77AFF7ADDD /* ConnectionsView.swift in Sources */,
+				3D25994409EEFD8878BD0560 /* CoverImage.swift in Sources */,
 				48C61193B109C0698EB79675 /* CreateGroupView.swift in Sources */,
 				4BB7EDDA294F541165474C85 /* DateFormat.swift in Sources */,
 				3EA66128EDB6DFFA01A9B2A1 /* Device.swift in Sources */,
@@ -652,7 +656,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ru.elva.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -732,7 +735,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ru.elva.app;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
