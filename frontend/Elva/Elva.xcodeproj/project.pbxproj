@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		04447A667F27545B8924DCAC /* GroupInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD36FC02339E6F93CD2D9A7B /* GroupInfoView.swift */; };
 		049E84ED941C47E4799A5F7B /* FullScreenPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDCC1EF9BDB1C783FE18EFB /* FullScreenPhotoView.swift */; };
+		04B0D04160C72D81F86D7928 /* Tour.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF4032FD975C721573207EF /* Tour.swift */; };
 		05A2E8B978D544734E5FA6F7 /* Subscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3EB616829AFA6F34FD371FD /* Subscription.swift */; };
 		063FF2FF7F0E7C20C037541F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136179B04B1B94BFB4532BB5 /* RootView.swift */; };
 		0A2BE52671DD712683074D61 /* PushRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBA737D7473F093DF834802 /* PushRouteTests.swift */; };
@@ -137,6 +138,7 @@
 		B9D8EC36E3736AFA67F2395C /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		BBBEC16D3376AA623A87C351 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		BCE210F76EF5E6CCEEDE0325 /* ElvaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElvaApp.swift; sourceTree = "<group>"; };
+		BCF4032FD975C721573207EF /* Tour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tour.swift; sourceTree = "<group>"; };
 		BE15F354D37B369D5AF4A045 /* Dev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Dev.xcconfig; sourceTree = "<group>"; };
 		BEDCC1EF9BDB1C783FE18EFB /* FullScreenPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenPhotoView.swift; sourceTree = "<group>"; };
 		C2B8A1F9B53EAB67C0895CED /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
@@ -182,6 +184,7 @@
 				BEDCC1EF9BDB1C783FE18EFB /* FullScreenPhotoView.swift */,
 				99E02364BF4647D4BE764B15 /* StateViews.swift */,
 				8944DEFF85E671450E8A01C6 /* Theme.swift */,
+				BCF4032FD975C721573207EF /* Tour.swift */,
 			);
 			path = DesignSystem;
 			sourceTree = "<group>";
@@ -614,6 +617,7 @@
 				5889CF0E19FF70356B77DF6B /* SubscriptionsView.swift in Sources */,
 				3AB2FBA94CFD83EA6E967ADD /* Theme.swift in Sources */,
 				3A0C1FF94EFCFD51108E3C2C /* TokenStore.swift in Sources */,
+				04B0D04160C72D81F86D7928 /* Tour.swift in Sources */,
 				FB23AA17EB998021EAB71601 /* User.swift in Sources */,
 				11805A063B9246222156899E /* WebSocketClient.swift in Sources */,
 			);

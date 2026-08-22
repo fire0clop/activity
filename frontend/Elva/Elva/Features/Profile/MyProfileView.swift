@@ -7,6 +7,7 @@ struct MyProfileView: View {
     @State private var fullScreen = false
     @State private var startIndex = 0
     @State private var confirmDelete = false
+    @State private var tourReset = false
     @State private var deleteError: String?
 
     var body: some View {
@@ -32,6 +33,11 @@ struct MyProfileView: View {
                 }
             }
             .navigationBarHidden(true)
+            .alert("Подсказки включены", isPresented: $tourReset) {
+                Button("Хорошо", role: .cancel) {}
+            } message: {
+                Text("Откройте ленту — обучение начнётся заново.")
+            }
             .sheet(isPresented: $showEdit) { if let me = auth.me { EditProfileView(me: me) } }
             .fullScreenCover(isPresented: $fullScreen) {
                 FullScreenPhotoView(images: auth.me?.photoURLs ?? [], start: startIndex)
@@ -141,6 +147,14 @@ struct MyProfileView: View {
             }
             Divider().background(Theme.line).padding(.leading, 50)
             actionRow("Телефон", value: auth.me?.phone ?? "", icon: "phone.fill") {}
+            Divider().background(Theme.line).padding(.leading, 50)
+            actionRow("Как это работает", value: nil, icon: "questionmark.circle.fill") {
+                // Сбрасываем отметки — ленты и карточка события покажут подсказки заново.
+                UserDefaults.standard.set(false, forKey: "tour.feed.v1")
+                UserDefaults.standard.set(false, forKey: "tour.event.v1")
+                Haptics.success()
+                tourReset = true
+            }
             Divider().background(Theme.line).padding(.leading, 50)
             actionRow("Сменить пароль", value: nil, icon: "lock.fill") { showPasswordReset = true }
             Divider().background(Theme.line).padding(.leading, 50)
