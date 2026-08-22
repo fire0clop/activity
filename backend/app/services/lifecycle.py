@@ -1,9 +1,12 @@
 import asyncio
+import contextlib
 import logging
 from datetime import UTC, datetime, timedelta
 
+import redis.asyncio as aioredis
 from sqlalchemy import or_, select, update
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation
 from app.models.event import Event
@@ -11,6 +14,23 @@ from app.models.participation import Participation
 from app.services import matching_service, request_service
 
 logger = logging.getLogger("lifecycle")
+
+
+async def _claim(redis: aioredis.Redis, key: str, ttl: int) -> bool:
+    """Захватить право выполнить цикл. True — этот процесс работает, остальные пропускают.
+
+    Gunicorn поднимает несколько воркеров, и каждый запускает свои фоновые задачи.
+    Без этого замка обход выполнялся бы по числу воркеров: участники получали бы
+    столько же одинаковых напоминаний, а повторяющееся событие клонировалось бы
+    в стольких же экземплярах. Замок живёт чуть меньше интервала, поэтому
+    следующий цикл снова свободен, а падение держателя не блокирует работу дольше
+    одного периода.
+    """
+    try:
+        return bool(await redis.set(key, "1", nx=True, ex=ttl))
+    except Exception:  # noqa: BLE001 - недоступность Redis не должна останавливать обслуживание
+        logger.warning("не удалось взять замок %s — цикл пропущен", key, exc_info=True)
+        return False
 
 SWEEP_INTERVAL_SEC = 300
 # Если у события нет ends_at, считаем завершённым через STALE_HOURS после начала.
@@ -108,9 +128,6 @@ async def _expire_requests_once() -> int:
         return n
 
 
-POSTER_IMPORT_INTERVAL_SEC = 6 * 3600
-
-
 async def run_poster_import() -> None:
     """Обновление афиши из внешнего источника.
 
@@ -119,35 +136,50 @@ async def run_poster_import() -> None:
     """
     from app.services import poster_import
 
-    while True:
-        try:
-            async with SessionLocal() as db:
-                stats = await poster_import.import_all(db)
-            total = sum(s["created"] + s["updated"] for s in stats)
-            if total:
-                logger.info("афиша обновлена: %s", stats)
-        except asyncio.CancelledError:
-            break
-        except Exception:  # noqa: BLE001 - недоступность источника не должна ронять приложение
-            logger.exception("не удалось обновить афишу")
-        await asyncio.sleep(POSTER_IMPORT_INTERVAL_SEC)
+    interval = settings.poster_import_interval_hours * 3600
+    redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        while True:
+            try:
+                if await _claim(redis, "lifecycle:poster_import", int(interval * 0.9)):
+                    async with SessionLocal() as db:
+                        stats = await poster_import.import_all(db)
+                    total = sum(s["created"] + s["updated"] for s in stats)
+                    if total:
+                        logger.info("афиша обновлена: %s", stats)
+            except asyncio.CancelledError:
+                break
+            except Exception:  # noqa: BLE001 - сбой источника не должен ронять приложение
+                logger.exception("не удалось обновить афишу")
+            await asyncio.sleep(interval)
+    finally:
+        with contextlib.suppress(Exception):
+            await redis.aclose()
 
 
 async def run_sweeper() -> None:
     """Фоновая задача: авто-финиш прошедших событий, архивация чатов, напоминания участникам."""
-    while True:
-        try:
-            n = await _sweep_once()
-            if n:
-                logger.info("lifecycle: finished %d past events", n)
-            r = await _send_reminders_once()
-            if r:
-                logger.info("lifecycle: sent %d reminders", r)
-            e = await _expire_requests_once()
-            if e:
-                logger.info("lifecycle: expired %d company requests", e)
-        except asyncio.CancelledError:
-            break
-        except Exception:  # noqa: BLE001
-            logger.exception("lifecycle sweep failed")
-        await asyncio.sleep(SWEEP_INTERVAL_SEC)
+    redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        while True:
+            try:
+                # Обход шлёт пуши и клонирует повторяющиеся события — выполнять его
+                # должен ровно один процесс, иначе всё это удвоится по числу воркеров.
+                if await _claim(redis, "lifecycle:sweep", int(SWEEP_INTERVAL_SEC * 0.9)):
+                    n = await _sweep_once()
+                    if n:
+                        logger.info("lifecycle: finished %d past events", n)
+                    r = await _send_reminders_once()
+                    if r:
+                        logger.info("lifecycle: sent %d reminders", r)
+                    e = await _expire_requests_once()
+                    if e:
+                        logger.info("lifecycle: expired %d company requests", e)
+            except asyncio.CancelledError:
+                break
+            except Exception:  # noqa: BLE001
+                logger.exception("lifecycle sweep failed")
+            await asyncio.sleep(SWEEP_INTERVAL_SEC)
+    finally:
+        with contextlib.suppress(Exception):
+            await redis.aclose()
