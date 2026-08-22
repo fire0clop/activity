@@ -73,6 +73,40 @@ final class TourController: ObservableObject {
     }
 }
 
+/// Содержание обучения по ленте. Живёт отдельно от экрана, потому что показывает
+/// его корневой контейнер: подсветка обязана накрывать и таб-бар, а он лежит выше
+/// вкладки — изнутри вкладки его не перекрыть, и кнопки обучения оказывались под ним.
+enum FeedTour {
+    static let storageKey = "tour.feed.v1"
+
+    static let steps: [TourStep] = [
+        TourStep(
+            id: "tour.pages",
+            title: "Здесь три ленты",
+            text: "«Активности» затевают люди — к ним можно присоединиться. «Афиша» идёт в городе сама по себе. «Хочу» — чужие желания, которые пока никто не взял на себя. Листаются пальцем.",
+            padding: 6, shape: .capsule
+        ),
+        TourStep(
+            id: "tour.filters",
+            title: "Сузить выдачу",
+            text: "Дата, категория и «только бесплатные» — в одном окне. Цифра на кнопке показывает, сколько фильтров включено, чтобы пустая лента не выглядела концом света.",
+            shape: .capsule
+        ),
+        TourStep(
+            id: "tour.map",
+            title: "То же самое на карте",
+            text: "Круглые цветные метки — сборы людей, тёмные квадратные — афиша. Удобно, когда важнее «что рядом со мной», чем «что сегодня».",
+            padding: 4, shape: .circle
+        ),
+        TourStep(
+            id: "tour.create",
+            title: "Позвать компанию",
+            text: "Придумали что-то — заведите событие: название, время, место. Люди рядом увидят его в ленте и откликнутся, а чат соберётся сам. На вкладке «Хочу» эта же кнопка заявляет желание, ни к чему не обязывая.",
+            padding: 4, shape: .circle
+        ),
+    ]
+}
+
 // MARK: - Подсветка
 
 /// Затемнение с вырезом вокруг элемента и пояснением рядом.
@@ -102,21 +136,19 @@ struct TourOverlay: View {
         GeometryReader { proxy in
             let cut = hole(in: proxy.size)
             ZStack(alignment: .topLeading) {
-                // Тап по затемнению ведёт дальше. Жест висит именно на нём, а не на
-                // всём слое: общий жест поверх перехватывал нажатия у собственных
-                // кнопок пояснения, и «Дальше» с «Пропустить» не срабатывали.
+                // Затемнение только гасит фон и не ловит нажатий. Раньше на нём висел
+                // жест «тап = дальше»: он срабатывал вместе с кнопкой, шаг проскакивал
+                // через один, а с края экрана обучение схлопывалось за одно касание.
+                // Управление осталось за кнопками — они однозначны.
                 dimming(cut, in: proxy.size)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onNext() }
+                    .allowsHitTesting(false)
                 if let cut { ring(cut) }
-                calloutLayout(cut, in: proxy.size)
+                calloutLayout(cut, in: proxy.size).zIndex(1)
             }
             .ignoresSafeArea()
         }
         .transition(.opacity)
-        .onAppear { if !reduceMotion { pulse = true } }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Обучение, шаг \(index + 1) из \(total): \(step.title)")
+        .onAppear { pulse = true }
     }
 
     /// Затемнение с дыркой. Рисуется одной фигурой по чётно-нечётному правилу —
@@ -147,34 +179,35 @@ struct TourOverlay: View {
             .stroke(Theme.accent, lineWidth: 2.5)
             .frame(width: rect.width, height: rect.height)
             .position(x: rect.midX, y: rect.midY)
-            .scaleEffect(pulse ? 1.04 : 1)
-            .opacity(pulse ? 0.75 : 1)
-            .animation(reduceMotion ? nil
-                       : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
+            // Однократное проявление вместо вечной пульсации. Бесконечная анимация
+            // не даёт экрану перейти в состояние покоя: система считает элементы под
+            // ней недоступными для нажатия, и автотесты на такой экран не работают.
+            .scaleEffect(pulse ? 1 : 1.08)
+            .opacity(pulse ? 1 : 0)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: pulse)
             .allowsHitTesting(false)
     }
 
-    /// Пояснение раскладывается распорками, а не по вычисленной координате.
-    /// Раньше позиция считалась от предполагаемой высоты карточки — длинный текст
-    /// в неё не влезал, обрезался, а кнопки уезжали за экран.
+    /// Пояснение прижимается к краю экрана, противоположному подсветке.
+    ///
+    /// Раньше положение вычислялось от подсвечиваемого элемента, и высота карточки
+    /// оказывалась зажата: длинный текст сжимался, а низ с кнопками срезался — со
+    /// стороны это выглядело как «кнопка не нажимается». Теперь высота карточки
+    /// свободна, и её низ гарантированно на экране: что именно подсвечено, и так
+    /// видно по кольцу.
     private func calloutLayout(_ hole: CGRect?, in size: CGSize) -> some View {
-        let gap: CGFloat = 18
-        let anchorY = hole?.midY ?? size.height / 2
-        let showsBelow = anchorY < size.height * 0.55
-
+        let highlightIsHigh = (hole?.midY ?? size.height / 2) < size.height / 2
         return VStack(spacing: 0) {
-            if showsBelow {
-                Spacer().frame(height: min((hole?.maxY ?? 0) + gap, size.height * 0.6))
+            if highlightIsHigh {
+                Spacer(minLength: 24)
                 callout
-                Spacer(minLength: 0)
             } else {
-                Spacer(minLength: 0)
                 callout
-                Spacer().frame(height: max(size.height - (hole?.minY ?? size.height) + gap, 120))
+                Spacer(minLength: 24)
             }
         }
-        .frame(width: size.width, height: size.height)
         .padding(.horizontal, 20)
+        .padding(.vertical, 28)
     }
 
     private var callout: some View {
@@ -199,6 +232,7 @@ struct TourOverlay: View {
                     Button("Пропустить", action: onSkip)
                         .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink2)
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("tour.skip")
                 }
                 Button(action: onNext) {
                     Text(index == total - 1 ? "Понятно" : "Дальше")
@@ -207,6 +241,7 @@ struct TourOverlay: View {
                         .background(Theme.accentInk, in: Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("tour.next")
             }
             .padding(.top, 2)
         }
@@ -220,26 +255,41 @@ struct TourOverlay: View {
 
 // MARK: - Подключение к экрану
 
+/// Носитель подсветки.
+///
+/// Отдельный вид с `@ObservedObject` нужен по существу: `overlayPreferenceValue`
+/// пересчитывает своё содержимое при изменении ЯКОРЕЙ, а не состояния. Якоря
+/// после первой отрисовки постоянны, поэтому смена шага не доходила до экрана:
+/// первый шаг показывался, а нажатие «Дальше» уже ничего не меняло.
+private struct TourHost: View {
+    @ObservedObject var controller: TourController
+    let anchors: [String: Anchor<CGRect>]
+
+    var body: some View {
+        GeometryReader { proxy in
+            if let step = controller.current {
+                TourOverlay(
+                    step: step,
+                    target: anchors[step.id].map { proxy[$0] },
+                    index: controller.stepIndex,
+                    total: controller.steps.count,
+                    onNext: { controller.next() },
+                    onSkip: { controller.finish() }
+                )
+            }
+        }
+        .ignoresSafeArea()
+        // Одна анимация на весь слой: вырез и пояснение раньше ехали по разным
+        // кривым и с разной длительностью — со стороны это выглядело рассинхроном.
+        .animation(.easeInOut(duration: 0.3), value: controller.stepIndex)
+    }
+}
+
 extension View {
     /// Навесить обучение на экран: подсветка рисуется поверх, по якорям.
     func tour(_ controller: TourController) -> some View {
         overlayPreferenceValue(TourAnchorKey.self) { anchors in
-            GeometryReader { proxy in
-                if let step = controller.current {
-                    TourOverlay(
-                        step: step,
-                        target: anchors[step.id].map { proxy[$0] },
-                        index: controller.stepIndex,
-                        total: controller.steps.count,
-                        onNext: { controller.next() },
-                        onSkip: { controller.finish() }
-                    )
-                }
-            }
-            .ignoresSafeArea()
-            // Одна анимация на весь слой: вырез и пояснение раньше ехали по разным
-            // кривым и с разной длительностью — со стороны это выглядело рассинхроном.
-            .animation(.easeInOut(duration: 0.3), value: controller.stepIndex)
+            TourHost(controller: controller, anchors: anchors)
         }
     }
 }

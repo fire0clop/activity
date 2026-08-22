@@ -33,41 +33,7 @@ struct FeedView: View {
     @State private var filters = FeedFilters()
     @State private var showFilters = false
     @Namespace private var pageIndicator
-    /// Отметка о просмотре обучения. Читаем её здесь, чтобы сброс из профиля
-    /// подхватился сразу, не дожидаясь пересоздания экрана.
-    @AppStorage("tour.feed.v1") private var feedTourSeen = false
 
-    /// Обучение объясняет устройство продукта, а не подписывает кнопки: три ленты
-    /// с разным смыслом — то, чего по иконкам не угадать.
-    @StateObject private var tour = TourController(
-        steps: [
-            TourStep(
-                id: "tour.pages",
-                title: "Здесь три ленты",
-                text: "«Активности» затевают люди — к ним можно присоединиться. «Афиша» идёт в городе сама по себе. «Хочу» — чужие желания, которые пока никто не взял на себя. Листаются пальцем.",
-                padding: 6, shape: .capsule
-            ),
-            TourStep(
-                id: "tour.filters",
-                title: "Сузить выдачу",
-                text: "Дата, категория и «только бесплатные» — в одном окне. Цифра на кнопке показывает, сколько фильтров включено, чтобы пустая лента не выглядела концом света.",
-                shape: .capsule
-            ),
-            TourStep(
-                id: "tour.map",
-                title: "То же самое на карте",
-                text: "Круглые цветные метки — сборы людей, тёмные квадратные — афиша. Удобно, когда важнее «что рядом со мной», чем «что сегодня».",
-                padding: 4, shape: .circle
-            ),
-            TourStep(
-                id: "tour.create",
-                title: "Позвать компанию",
-                text: "Придумали что-то — заведите событие: название, время, место. Люди рядом увидят его в ленте и откликнутся, а чат соберётся сам. На вкладке «Хочу» эта же кнопка заявляет желание, ни к чему не обязывая.",
-                padding: 4, shape: .circle
-            ),
-        ],
-        storageKey: "tour.feed.v1"
-    )
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -94,16 +60,12 @@ struct FeedView: View {
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
             .task {
                 vm.configure(auth.api)
-                location.request()
+                // В UI-тестах системный запрос геопозиции перехватывает экран и делает
+                // прогон нестабильным — там точку задаём заранее.
+                if ProcessInfo.processInfo.environment["UITEST_SKIP_LOCATION"] == nil {
+                    location.request()
+                }
                 if vm.items.isEmpty { await vm.refresh() }
-            }
-            // Обучение не зависит от загрузки данных: раньше оно ждало ответа сети
-            // внутри той же задачи и на медленном соединении не показывалось вовсе.
-            // Шапка и переключатель разделов на экране сразу — объяснять есть что.
-            .onAppear { tour.startIfNeeded() }
-            .tour(tour)
-            .onChange(of: feedTourSeen) { _, seen in
-                if !seen { tour.restart() }
             }
             .onReceive(location.$coordinate.compactMap { $0 }) { c in
                 vm.setCoordinate(lat: c.latitude, lng: c.longitude)
