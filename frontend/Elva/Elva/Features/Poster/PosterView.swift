@@ -46,7 +46,10 @@ struct PosterFeedView: View {
             }
             .refreshable { await load() }
         }
-        .task { await load() }
+        // Ключ по координате: при смене города параметр меняется, и загрузка
+        // повторяется сама. С обычным .task она случилась бы только один раз,
+        // и список остался бы от прежнего города до ручного обновления.
+        .task(id: locationKey) { await load() }
         .onSubmit { Task { await load() } }
         .sheet(isPresented: $showFilters) {
             FiltersSheet(filters: $filters) { Task { await load() } }
@@ -104,6 +107,12 @@ struct PosterFeedView: View {
         }
     }
 
+    /// Идентификатор точки для перезапуска загрузки: CLLocationCoordinate2D
+    /// не сравнивается сам по себе.
+    private var locationKey: String {
+        "\(coordinate.latitude),\(coordinate.longitude)"
+    }
+
     private var hasFilters: Bool {
         !filters.isEmpty || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -134,15 +143,7 @@ struct PosterFeedView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Запасная обложка обязательна: смешанный список из карточек с фото
                 // и без него рвёт ритм сильнее любого отступа.
-                Group {
-                    if let url = p.imageURL, let u = URL(string: url) {
-                        AsyncImage(url: u) { $0.resizable().scaledToFill() }
-                            placeholder: { CategoryCover(category: p.category) }
-                    } else {
-                        CategoryCover(category: p.category)
-                    }
-                }
-                .frame(height: 150).frame(maxWidth: .infinity).clipped()
+                CoverImage(url: p.imageURL, category: p.category, height: 150)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         CategoryBadge(category: p.category, style: .tinted)
@@ -217,10 +218,7 @@ struct PosterDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                if let url = item.imageURL, let u = URL(string: url) {
-                    AsyncImage(url: u) { $0.resizable().scaledToFill() } placeholder: { Theme.secondaryBg }
-                        .frame(height: 220).frame(maxWidth: .infinity).clipped()
-                }
+                CoverImage(url: item.imageURL, category: item.category, height: 220)
                 VStack(alignment: .leading, spacing: 14) {
                     CategoryBadge(category: item.category)
                     Text(item.title).font(.display(26)).foregroundStyle(Theme.ink)

@@ -25,6 +25,11 @@ struct RequestsView: View {
 
     private var createBinding: Binding<Bool> { showCreate ?? $showCreateInternal }
 
+    /// При смене города координата меняется — перезагружаем список сами.
+    private var locationKey: String {
+        "\(coordinate.latitude),\(coordinate.longitude)"
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: FeedLayout.cardGap) {
@@ -80,7 +85,7 @@ struct RequestsView: View {
                 )
             }
         }
-        .task { await load() }
+        .task(id: locationKey) { await load() }
         .refreshable { await load() }
     }
 
