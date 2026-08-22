@@ -33,6 +33,41 @@ struct FeedView: View {
     @State private var filters = FeedFilters()
     @State private var showFilters = false
     @Namespace private var pageIndicator
+    /// Отметка о просмотре обучения. Читаем её здесь, чтобы сброс из профиля
+    /// подхватился сразу, не дожидаясь пересоздания экрана.
+    @AppStorage("tour.feed.v1") private var feedTourSeen = false
+
+    /// Обучение объясняет устройство продукта, а не подписывает кнопки: три ленты
+    /// с разным смыслом — то, чего по иконкам не угадать.
+    @StateObject private var tour = TourController(
+        steps: [
+            TourStep(
+                id: "tour.pages",
+                title: "Здесь три ленты",
+                text: "«Активности» — то, что затевают люди: к ним можно присоединиться. «Афиша» — что идёт в городе само по себе. «Хочу» — чужие желания, которые пока никто не взял на себя. Листаются пальцем.",
+                padding: 6, shape: .capsule
+            ),
+            TourStep(
+                id: "tour.filters",
+                title: "Сузить выдачу",
+                text: "Дата, категория и «только бесплатные» — в одном окне. Цифра на кнопке показывает, сколько фильтров включено, чтобы пустая лента не выглядела концом света.",
+                shape: .capsule
+            ),
+            TourStep(
+                id: "tour.map",
+                title: "То же самое на карте",
+                text: "Круглые цветные метки — сборы людей, тёмные квадратные — афиша. Удобно, когда важнее «что рядом со мной», чем «что сегодня».",
+                padding: 4, shape: .circle
+            ),
+            TourStep(
+                id: "tour.create",
+                title: "Позвать компанию",
+                text: "Придумали что-то — заведите событие: название, время, место. Люди рядом увидят его в ленте и откликнутся, а чат соберётся сам. На вкладке «Хочу» эта же кнопка заявляет желание, ни к чему не обязывая.",
+                padding: 4, shape: .circle
+            ),
+        ],
+        storageKey: "tour.feed.v1"
+    )
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -61,6 +96,13 @@ struct FeedView: View {
                 vm.configure(auth.api)
                 location.request()
                 if vm.items.isEmpty { await vm.refresh() }
+                // Обучение — после первой загрузки: подсвечивать элементы поверх
+                // скелетонов бессмысленно, человек ещё не видел, что это за экран.
+                tour.startIfNeeded()
+            }
+            .tour(tour)
+            .onChange(of: feedTourSeen) { _, seen in
+                if !seen { tour.restart() }
             }
             .onReceive(location.$coordinate.compactMap { $0 }) { c in
                 vm.setCoordinate(lat: c.latitude, lng: c.longitude)
@@ -137,6 +179,7 @@ struct FeedView: View {
         .padding(3)
         .background(Theme.surface, in: Capsule())
         .overlay(Capsule().stroke(Theme.lineStrong))
+        .tourAnchor("tour.pages")
     }
 
     /// Настроение страницы. Отдельно от названия вкладки: вкладка называет раздел.
@@ -222,11 +265,13 @@ struct FeedView: View {
                 // перескакивают на 44pt при каждом свайпе.
                 circleButton(isMap ? "list.bullet" : "map") { isMap.toggle() }
                     .accessibilityLabel(isMap ? "Показать списком" : "Показать на карте")
+                    .tourAnchor("tour.map")
                     .opacity(page == 2 ? 0 : 1)
                     .disabled(page == 2)
                     .accessibilityHidden(page == 2)
                 // Афишу заводит оператор — там создавать нечего.
                 plusButton
+                    .tourAnchor("tour.create")
                     .opacity(page == 1 ? 0 : 1)
                     .disabled(page == 1)
                     .accessibilityHidden(page == 1)
@@ -284,6 +329,7 @@ struct FeedView: View {
 
             HStack(spacing: 8) {
                 FiltersButton(filters: filters) { showFilters = true }
+                    .tourAnchor("tour.filters")
                 if !filters.isEmpty {
                     Button {
                         filters.reset(); Haptics.tap()

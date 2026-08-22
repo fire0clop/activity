@@ -17,6 +17,20 @@ struct EventDetailView: View {
     @State private var showInvite = false
     @State private var inviteResult: String?
 
+    /// Одна подсказка в карточке чужого события — там, где человек принимает
+    /// решение. Объясняем не кнопку, а что произойдёт после нажатия.
+    @StateObject private var tour = TourController(
+        steps: [
+            TourStep(
+                id: "tour.join",
+                title: "Отклик — не запись",
+                text: "Организатор увидит вашу заявку и решит, берёт ли он вас. Примут — откроется общий чат, придёт напоминание перед встречей, а после неё вы оцените друг друга. Отказаться можно в любой момент.",
+                padding: 6, shape: .rounded
+            ),
+        ],
+        storageKey: "tour.event.v1"
+    )
+
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.paper.ignoresSafeArea()
@@ -45,7 +59,16 @@ struct EventDetailView: View {
                 Task { await load() }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            // Только там, где отклик вообще возможен: организатору и уже принятому
+            // участнику этот текст ничего не объясняет.
+            if let e = event, !e.isOrganizer,
+               ParticipationStatus(raw: e.myParticipation?.status) == .unknown {
+                tour.startIfNeeded()
+            }
+        }
+        .tour(tour)
         .confirmationDialog("Пожаловаться на событие", isPresented: $showReport, titleVisibility: .visible) {
             Button("Спам") { Task { await report("spam") } }
             Button("Неуместное содержание") { Task { await report("inappropriate") } }
@@ -301,6 +324,7 @@ struct EventDetailView: View {
                             ctaLabel("Откликнуться", filled: true, loading: actionLoading)
                         }
                         .disabled(actionLoading)
+                        .tourAnchor("tour.join")
                     }
                 }
             }
