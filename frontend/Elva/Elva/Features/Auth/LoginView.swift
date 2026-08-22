@@ -18,7 +18,7 @@ struct LoginView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.2.wave.2.fill")
                         .font(.system(size: 54)).foregroundStyle(Theme.accent)
-                    Text("Сходка").font(.largeTitle).fontWeight(.bold)
+                    Text("Elva").font(.largeTitle).fontWeight(.bold)
                     Text("Найди компанию под любую активность")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
