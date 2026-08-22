@@ -50,6 +50,17 @@
                ReferencedContainer = "container:Elva.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5366A3143241ACB139AF9AF3"
+               BuildableName = "ElvaUITests.xctest"
+               BlueprintName = "ElvaUITests"
+               ReferencedContainer = "container:Elva.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

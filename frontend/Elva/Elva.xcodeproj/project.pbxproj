@@ -35,6 +35,7 @@
 		48C61193B109C0698EB79675 /* CreateGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E8BB0B9C53C928E677A30D /* CreateGroupView.swift */; };
 		4BB7EDDA294F541165474C85 /* DateFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76E9861E8AD9BEB945C498A /* DateFormat.swift */; };
 		54EBB8A812F777259A0FD70A /* PublicProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 576033A0996821947AA4346E /* PublicProfileView.swift */; };
+		550EABF2F7140920E2AD4AB9 /* TourUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F34AF4D73744D32AC8608DC /* TourUITests.swift */; };
 		5889CF0E19FF70356B77DF6B /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EBA54905864FD218993CBF3 /* SubscriptionsView.swift */; };
 		5A0D0C653F1D791CBA702E82 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B8A1F9B53EAB67C0895CED /* APIClientTests.swift */; };
 		5EBACF8F36999D40C400CA4F /* FeedViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500FD313842104D3C75DC962 /* FeedViewModelTests.swift */; };
@@ -75,6 +76,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		1BC211D43D3A3D12DA572018 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 205FFECECFFD3345FA4AF404 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CFB36D0B7631B8B100B2AFCC;
+			remoteInfo = Elva;
+		};
 		561148FDB7C50F420AE085C6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 205FFECECFFD3345FA4AF404 /* Project object */;
@@ -97,6 +105,7 @@
 		25CCE7E1AD3C10EBA2B41352 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		29FF10B09F2827CEC08C6C47 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		2DFC7DF5FC5289179BE7FA1A /* Participation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Participation.swift; sourceTree = "<group>"; };
+		2F34AF4D73744D32AC8608DC /* TourUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TourUITests.swift; sourceTree = "<group>"; };
 		2FDECC69465E4AA9B4CAC0DF /* PosterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterView.swift; sourceTree = "<group>"; };
 		302F526B44F11E198DC37D71 /* EventEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEditView.swift; sourceTree = "<group>"; };
 		30E8BB0B9C53C928E677A30D /* CreateGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupView.swift; sourceTree = "<group>"; };
@@ -114,6 +123,7 @@
 		579CF07EE7E5A1FCF15EA1D8 /* ParticipantsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipantsView.swift; sourceTree = "<group>"; };
 		59237858F8E92ECB9422C01C /* Auth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Auth.swift; sourceTree = "<group>"; };
 		5E309BEC1603AECD54EFC5DE /* CategoryPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPicker.swift; sourceTree = "<group>"; };
+		613A7C57058F3F33536A5D98 /* ElvaUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ElvaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		67601A1133A3A809F51A8F6B /* RequestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestsView.swift; sourceTree = "<group>"; };
 		6A3F6A1E089BA2A84908EFDE /* MyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyProfileView.swift; sourceTree = "<group>"; };
 		6FC74922BD3083BFB68602B9 /* MyEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyEventsView.swift; sourceTree = "<group>"; };
@@ -240,6 +250,14 @@
 			path = EventDetail;
 			sourceTree = "<group>";
 		};
+		3A2ED5D2CA80FAB6C021A9D0 /* ElvaUITests */ = {
+			isa = PBXGroup;
+			children = (
+				2F34AF4D73744D32AC8608DC /* TourUITests.swift */,
+			);
+			path = ElvaUITests;
+			sourceTree = "<group>";
+		};
 		474362F85B77EA0F3677BA3A /* Location */ = {
 			isa = PBXGroup;
 			children = (
@@ -302,6 +320,7 @@
 			children = (
 				485CFB2D796B748C7AC9379A /* Elva.app */,
 				B5394215B69CEDA8205DA634 /* ElvaTests.xctest */,
+				613A7C57058F3F33536A5D98 /* ElvaUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -345,6 +364,7 @@
 				CCB08C7E71FB5BD35551BB7E /* Configs */,
 				CCCA9BC40911BEC9E2517283 /* Elva */,
 				547EE62160E96DB4034FBAD0 /* ElvaTests */,
+				3A2ED5D2CA80FAB6C021A9D0 /* ElvaUITests */,
 				7DB20A6097655EAFEDB0A802 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -471,6 +491,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5366A3143241ACB139AF9AF3 /* ElvaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A01363F15CEEA241DA1152F5 /* Build configuration list for PBXNativeTarget "ElvaUITests" */;
+			buildPhases = (
+				CDCA594492722272CCDD701F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5AD7379116A7D3EDE56556D6 /* PBXTargetDependency */,
+			);
+			name = ElvaUITests;
+			packageProductDependencies = (
+			);
+			productName = ElvaUITests;
+			productReference = 613A7C57058F3F33536A5D98 /* ElvaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C9989FD9080D14527E39DFCD /* ElvaTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 78048C501907123E81A41EE9 /* Build configuration list for PBXNativeTarget "ElvaTests" */;
@@ -516,6 +554,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					5366A3143241ACB139AF9AF3 = {
+						DevelopmentTeam = Z3PM3LR5FF;
+						ProvisioningStyle = Automatic;
+						TestTargetID = CFB36D0B7631B8B100B2AFCC;
+					};
 					C9989FD9080D14527E39DFCD = {
 						DevelopmentTeam = Z3PM3LR5FF;
 						ProvisioningStyle = Automatic;
@@ -542,6 +585,7 @@
 			targets = (
 				CFB36D0B7631B8B100B2AFCC /* Elva */,
 				C9989FD9080D14527E39DFCD /* ElvaTests */,
+				5366A3143241ACB139AF9AF3 /* ElvaUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -623,6 +667,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CDCA594492722272CCDD701F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				550EABF2F7140920E2AD4AB9 /* TourUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D87416DBAC4A9FED519CF18E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -639,6 +691,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		5AD7379116A7D3EDE56556D6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CFB36D0B7631B8B100B2AFCC /* Elva */;
+			targetProxy = 1BC211D43D3A3D12DA572018 /* PBXContainerItemProxy */;
+		};
 		7C77EAFE1E81EAD188D9E188 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = CFB36D0B7631B8B100B2AFCC /* Elva */;
@@ -726,6 +783,23 @@
 			};
 			name = Release;
 		};
+		579EB07A366F3D976DDBB174 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ru.elva.ElvaUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Elva;
+			};
+			name = Debug;
+		};
 		7B4F1AE1D437BBED726C315B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = BE15F354D37B369D5AF4A045 /* Dev.xcconfig */;
@@ -761,6 +835,23 @@
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Elva.app/Elva";
 			};
 			name = Debug;
+		};
+		8946C09638C97850FF7B914D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ru.elva.ElvaUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Elva;
+			};
+			name = Release;
 		};
 		BFB0AF812B1674373BB5A814 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -863,6 +954,15 @@
 			buildConfigurations = (
 				886AD49401C26036E6CFA070 /* Debug */,
 				BFB0AF812B1674373BB5A814 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A01363F15CEEA241DA1152F5 /* Build configuration list for PBXNativeTarget "ElvaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				579EB07A366F3D976DDBB174 /* Debug */,
+				8946C09638C97850FF7B914D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

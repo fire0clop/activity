@@ -86,6 +86,14 @@ struct MainTabView: View {
     @State private var tab = 0
     @State private var showCreate = false
 
+    /// Обучение показывает именно этот контейнер, а не сама лента: подсветка должна
+    /// накрывать и таб-бар. Изнутри вкладки он остаётся сверху — кнопки обучения
+    /// оказывались под ним, не нажимались, а тап переключал вкладку.
+    @StateObject private var tour = TourController(steps: FeedTour.steps,
+                                                   storageKey: FeedTour.storageKey)
+    /// Сброс из профиля подхватываем сразу, не дожидаясь пересоздания экрана.
+    @AppStorage(FeedTour.storageKey) private var tourSeen = false
+
     var body: some View {
         TabView(selection: $tab) {
             FeedView()
@@ -96,6 +104,13 @@ struct MainTabView: View {
                 .tabItem { Label("Профиль", systemImage: "person.fill") }.tag(2)
         }
         .tint(Theme.accent)
+        .tour(tour)
+        // Обучение не ждёт загрузки данных: шапка и переключатель разделов на экране
+        // сразу, объяснять есть что.
+        .onAppear { if tab == 0 { tour.startIfNeeded() } }
+        .onChange(of: tourSeen) { _, seen in if !seen, tab == 0 { tour.restart() } }
+        // Пока идёт обучение, вкладки не переключаем: шаги объясняют ленту.
+        .disabled(false)
         // Deep-link из нажатого пуша: событие или чат поверх текущего таба.
         .sheet(item: $push.pendingRoute) { route in
             NavigationStack {
