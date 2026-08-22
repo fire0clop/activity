@@ -88,31 +88,40 @@ struct TourOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
 
-    private var hole: CGRect? {
-        target?.insetBy(dx: -step.padding, dy: -step.padding)
+    /// Вырез, прижатый к границам экрана: у элементов во всю ширину расширенная
+    /// рамка вылезала за край и кольцо выглядело обрезанным.
+    private func hole(in size: CGSize) -> CGRect? {
+        guard let target else { return nil }
+        let expanded = target.insetBy(dx: -step.padding, dy: -step.padding)
+        // Поля от краёв: у элементов во всю ширину кольцо упиралось в границы экрана
+        // и читалось как обрезанное.
+        return expanded.intersection(CGRect(origin: .zero, size: size).insetBy(dx: 14, dy: 14))
     }
 
     var body: some View {
         GeometryReader { proxy in
+            let cut = hole(in: proxy.size)
             ZStack(alignment: .topLeading) {
-                dimming(in: proxy.size)
-                if let hole { ring(hole) }
-                callout(in: proxy.size)
+                // Тап по затемнению ведёт дальше. Жест висит именно на нём, а не на
+                // всём слое: общий жест поверх перехватывал нажатия у собственных
+                // кнопок пояснения, и «Дальше» с «Пропустить» не срабатывали.
+                dimming(cut, in: proxy.size)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onNext() }
+                if let cut { ring(cut) }
+                calloutLayout(cut, in: proxy.size)
             }
             .ignoresSafeArea()
         }
         .transition(.opacity)
         .onAppear { if !reduceMotion { pulse = true } }
-        // Тап мимо пояснения — следующий шаг: промахнуться по кнопке нельзя.
-        .contentShape(Rectangle())
-        .onTapGesture { onNext() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Обучение, шаг \(index + 1) из \(total): \(step.title)")
     }
 
     /// Затемнение с дыркой. Рисуется одной фигурой по чётно-нечётному правилу —
     /// иначе край выреза получается с полупрозрачной каймой.
-    private func dimming(in size: CGSize) -> some View {
+    private func dimming(_ hole: CGRect?, in size: CGSize) -> some View {
         Path { path in
             path.addRect(CGRect(origin: .zero, size: size))
             if let hole {
@@ -125,7 +134,6 @@ struct TourOverlay: View {
             }
         }
         .fill(Theme.ink.opacity(0.62), style: FillStyle(eoFill: true))
-        .animation(.easeInOut(duration: 0.28), value: hole?.origin.y)
     }
 
     @ViewBuilder
@@ -146,13 +154,31 @@ struct TourOverlay: View {
             .allowsHitTesting(false)
     }
 
-    private func callout(in size: CGSize) -> some View {
-        let width = min(size.width - 40, 340)
-        let below = (hole?.maxY ?? size.height / 2) + 16
-        let showsBelow = below + 190 < size.height
-        let y = showsBelow ? below : max(60, (hole?.minY ?? size.height / 2) - 190)
+    /// Пояснение раскладывается распорками, а не по вычисленной координате.
+    /// Раньше позиция считалась от предполагаемой высоты карточки — длинный текст
+    /// в неё не влезал, обрезался, а кнопки уезжали за экран.
+    private func calloutLayout(_ hole: CGRect?, in size: CGSize) -> some View {
+        let gap: CGFloat = 18
+        let anchorY = hole?.midY ?? size.height / 2
+        let showsBelow = anchorY < size.height * 0.55
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(spacing: 0) {
+            if showsBelow {
+                Spacer().frame(height: min((hole?.maxY ?? 0) + gap, size.height * 0.6))
+                callout
+                Spacer(minLength: 0)
+            } else {
+                Spacer(minLength: 0)
+                callout
+                Spacer().frame(height: max(size.height - (hole?.minY ?? size.height) + gap, 120))
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .padding(.horizontal, 20)
+    }
+
+    private var callout: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text(step.title).font(.serifTitle(21, weight: .bold)).foregroundStyle(Theme.ink)
                 .fixedSize(horizontal: false, vertical: true)
             Text(step.text).font(.system(size: 15)).foregroundStyle(Theme.ink2)
@@ -168,10 +194,11 @@ struct TourOverlay: View {
                             .frame(width: i == index ? 16 : 6, height: 6)
                     }
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 if index < total - 1 {
                     Button("Пропустить", action: onSkip)
                         .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.ink2)
+                        .buttonStyle(.plain)
                 }
                 Button(action: onNext) {
                     Text(index == total - 1 ? "Понятно" : "Дальше")
@@ -179,16 +206,15 @@ struct TourOverlay: View {
                         .padding(.horizontal, 18).padding(.vertical, 10)
                         .background(Theme.accentInk, in: Capsule())
                 }
+                .buttonStyle(.plain)
             }
             .padding(.top, 2)
         }
         .padding(16)
-        .frame(width: width, alignment: .leading)
+        .frame(maxWidth: 360, alignment: .leading)
         .background(Theme.paper, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.lineStrong))
         .shadow(color: Theme.ink.opacity(0.25), radius: 20, y: 8)
-        .position(x: size.width / 2, y: y + 95)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: index)
     }
 }
 
@@ -211,7 +237,9 @@ extension View {
                 }
             }
             .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.25), value: controller.stepIndex)
+            // Одна анимация на весь слой: вырез и пояснение раньше ехали по разным
+            // кривым и с разной длительностью — со стороны это выглядело рассинхроном.
+            .animation(.easeInOut(duration: 0.3), value: controller.stepIndex)
         }
     }
 }
