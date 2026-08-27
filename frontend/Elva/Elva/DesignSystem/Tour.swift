@@ -133,14 +133,19 @@ struct TourOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
 
-    /// Вырез, прижатый к границам экрана: у элементов во всю ширину расширенная
-    /// рамка вылезала за край и кольцо выглядело обрезанным.
+    /// Вырез вокруг элемента с полем, которое влезает в экран.
+    ///
+    /// Раньше расширенная рамка просто обрезалась о границу экрана. У кнопки,
+    /// прижатой к левому краю, слева срезалось больше, чем справа, и кольцо
+    /// выглядело съехавшим. Теперь поле сжимается одинаково со всех сторон —
+    /// кольцо остаётся симметричным, просто становится уже.
     private func hole(in size: CGSize) -> CGRect? {
         guard let target else { return nil }
-        let expanded = target.insetBy(dx: -step.padding, dy: -step.padding)
-        // Поля от краёв: у элементов во всю ширину кольцо упиралось в границы экрана
-        // и читалось как обрезанное.
-        return expanded.intersection(CGRect(origin: .zero, size: size).insetBy(dx: 14, dy: 14))
+        let bounds = CGRect(origin: .zero, size: size).insetBy(dx: 14, dy: 14)
+        let room = min(step.padding,
+                       target.minX - bounds.minX, bounds.maxX - target.maxX,
+                       target.minY - bounds.minY, bounds.maxY - target.maxY)
+        return target.insetBy(dx: -max(room, 0), dy: -max(room, 0))
     }
 
     var body: some View {
