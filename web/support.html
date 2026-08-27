@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Поддержка Elva</title>
+<link rel="stylesheet" href="/_style.css">
+<div class="wrap">
+  <h1>Поддержка Elva</h1>
+  <p class="lead">Напишите, что случилось. Отвечаем на указанный вами адрес,
+    обычно в течение двух рабочих дней.</p>
+
+  <div class="card">
+    <form id="f">
+      <label for="contact">Куда ответить</label>
+      <input id="contact" name="contact" required maxlength="200"
+             placeholder="Электронная почта или телефон">
+      <label for="message">Что произошло</label>
+      <textarea id="message" name="message" required minlength="10" maxlength="4000"
+                placeholder="Опишите проблему. Если можете — укажите модель телефона, версию iOS и что делали перед тем, как всё пошло не так."></textarea>
+      <button type="submit" id="b">Отправить</button>
+      <div class="msg ok" id="ok">Обращение отправлено. Ответим на указанный контакт.</div>
+      <div class="msg err" id="err"></div>
+      <p class="note">Отправляя обращение, вы передаёте нам указанный контакт и текст письма —
+        только для того, чтобы ответить. Подробности — в
+        <a href="/privacy">политике конфиденциальности</a>.</p>
+    </form>
+  </div>
+
+  <h2>Частые вопросы</h2>
+  <ul>
+    <li><b>Не приходит код по SMS.</b> Проверьте номер и подождите минуту: повторная отправка
+      доступна не сразу. Если код не пришёл дважды — напишите нам, укажите номер.</li>
+    <li><b>Лента пустая.</b> Скорее всего, рядом пока никто ничего не затевает. Смените город
+      в шапке ленты или заведите событие сами — так это и начинается.</li>
+    <li><b>Не показывает события рядом.</b> Разрешите доступ к геопозиции в настройках iOS
+      или выберите город вручную.</li>
+    <li><b>Как удалить аккаунт.</b> Профиль → «Удалить аккаунт». Данные удаляются вместе с ним;
+      если кнопка недоступна, напишите нам с номера, на который зарегистрированы.</li>
+    <li><b>Жалоба на человека или событие.</b> На карточке события и в профиле есть
+      «Пожаловаться» и «Заблокировать». Мы разбираем такие обращения в первую очередь.</li>
+  </ul>
+
+  <footer>Elva · <a href="/privacy">Политика конфиденциальности</a></footer>
+</div>
+<script>
+const f=document.getElementById('f'),b=document.getElementById('b'),
+      ok=document.getElementById('ok'),err=document.getElementById('err');
+f.addEventListener('submit',async e=>{
+  e.preventDefault(); ok.style.display=err.style.display='none'; b.disabled=true;
+  b.textContent='Отправляем…';
+  try{
+    const r=await fetch('/api/v1/support',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contact:f.contact.value,message:f.message.value})});
+    if(r.status===204){ok.style.display='block';f.reset();}
+    else if(r.status===429){err.textContent='Слишком много обращений с этого адреса. Попробуйте через час.';err.style.display='block';}
+    else{err.textContent='Не удалось отправить. Попробуйте ещё раз чуть позже.';err.style.display='block';}
+  }catch(_){err.textContent='Нет связи с сервером. Проверьте интернет и попробуйте снова.';err.style.display='block';}
+  b.disabled=false; b.textContent='Отправить';
+});
+</script>
+</html>

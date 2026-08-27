@@ -1,0 +1,30 @@
+api.event-serv.ru {
+    reverse_proxy localhost:8000
+}
+
+# Наружу на этом домене отдаём только связку с приложением, переход на событие
+# и две обязательные для App Store страницы. Веб-версии продукта нет.
+event-serv.ru {
+    root * /opt/activity/web
+
+    @links path /.well-known/apple-app-site-association /e/*
+    handle @links {
+        reverse_proxy localhost:8000
+    }
+
+    # Форма поддержки шлёт на тот же домен — так обходимся без CORS.
+    @support path /api/v1/support
+    handle @support {
+        reverse_proxy localhost:8000
+    }
+
+    @pages path /support /privacy /_style.css
+    handle @pages {
+        try_files {path}.html {path}
+        file_server
+    }
+
+    handle {
+        respond "Not Found" 404
+    }
+}
