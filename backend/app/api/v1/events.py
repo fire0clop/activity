@@ -304,7 +304,12 @@ async def my_events(
     stmt = (
         select(Event, User, accepted_sq.label("cnt"), my_status_sq.label("my"))
         .join(User, User.id == Event.organizer_id)
-        .where(or_(Event.organizer_id == current_user.id, Event.id.in_(my_part_sq)))
+        .where(
+            or_(Event.organizer_id == current_user.id, Event.id.in_(my_part_sq)),
+            # Своё отменённое событие человек удалил сам — в списке ему делать нечего.
+            # Чужое отменённое оставляем: участнику важно увидеть, что встречи не будет.
+            or_(Event.status != "cancelled", Event.organizer_id != current_user.id),
+        )
         .order_by(Event.starts_at.desc())
         .limit(limit)
     )
