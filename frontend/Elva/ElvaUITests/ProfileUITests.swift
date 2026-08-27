@@ -67,4 +67,40 @@ final class ProfileUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Получить код"].waitForExistence(timeout: 3),
                       "После нажатия ничего не произошло — окно смены пароля не открылось")
     }
+
+    /// «Как это работает» обязано доводить дело до конца.
+    ///
+    /// Сообщение о включении подсказок всплывало, а на ленте потом ничего не
+    /// появлялось: сброс происходит на вкладке «Профиль», а обучение стартовало
+    /// только если человек уже был на ленте в этот момент.
+    ///
+    /// Отметку «обучение пройдено» здесь нельзя подкладывать аргументом запуска:
+    /// домен аргументов перекрывает запись самого приложения, и сброс изнутри
+    /// оказался бы не виден. Поэтому проходим ровно тот путь, что и человек.
+    func testHowItWorksActuallyShowsTourOnFeed() {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_ACCESS_TOKEN"] =
+            ProcessInfo.processInfo.environment["UITEST_ACCESS_TOKEN"] ?? ""
+        app.launchEnvironment["UITEST_REFRESH_TOKEN"] =
+            ProcessInfo.processInfo.environment["UITEST_REFRESH_TOKEN"] ?? ""
+        app.launchEnvironment["UITEST_SKIP_LOCATION"] = "1"
+        app.launch()
+
+        // Приводим к известному состоянию: обучение пройдено.
+        let firstStep = app.staticTexts["Здесь три ленты"]
+        if firstStep.waitForExistence(timeout: 10) {
+            app.buttons["tour.skip"].tap()
+            XCTAssertFalse(firstStep.waitForExistence(timeout: 3), "Обучение не закрылось")
+        }
+
+        app.buttons["Профиль"].tap()
+        let row = app.buttons["Как это работает"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Профиль не открылся")
+        row.tap()
+        app.buttons["Хорошо"].tap()
+
+        app.buttons["Лента"].tap()
+        XCTAssertTrue(firstStep.waitForExistence(timeout: 10),
+                      "Подсказки включили, но на ленте они не показались")
+    }
 }

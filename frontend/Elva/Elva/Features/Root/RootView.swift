@@ -107,10 +107,12 @@ struct MainTabView: View {
         .tour(tour)
         // Обучение не ждёт загрузки данных: шапка и переключатель разделов на экране
         // сразу, объяснять есть что.
-        .onAppear { if tab == 0 { tour.startIfNeeded() } }
-        .onChange(of: tourSeen) { _, seen in if !seen, tab == 0 { tour.restart() } }
-        // Пока идёт обучение, вкладки не переключаем: шаги объясняют ленту.
-        .disabled(false)
+        .onAppear(perform: startTourIfOnFeed)
+        // Сброс из профиля происходит на другой вкладке, поэтому одного отклика на
+        // отметку мало: без реакции на смену вкладки «Как это работает» показывало
+        // сообщение, а на ленте потом ничего не появлялось.
+        .onChange(of: tab) { _, _ in startTourIfOnFeed() }
+        .onChange(of: tourSeen) { _, _ in startTourIfOnFeed() }
         // Deep-link из нажатого пуша: событие или чат поверх текущего таба.
         .sheet(item: $push.pendingRoute) { route in
             NavigationStack {
@@ -124,6 +126,12 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showCreate) { NavigationStack { EventCreateView() } }
         .onAppear(perform: applyUITestRoute)
+    }
+
+    /// Обучение живёт на ленте: на других вкладках его шаги не про что.
+    private func startTourIfOnFeed() {
+        guard tab == 0 else { return }
+        tour.startIfNeeded()
     }
 
     /// DEBUG-only: переход на нужный экран по переменной окружения запуска — для headless

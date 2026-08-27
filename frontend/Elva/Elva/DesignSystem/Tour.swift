@@ -53,7 +53,9 @@ final class TourController: ObservableObject {
 
     /// Запустить, если человек этого ещё не видел.
     func startIfNeeded() {
-        guard !wasSeen, !steps.isEmpty else { return }
+        // Идущее обучение не начинаем заново: иначе возврат на ленту откидывал бы
+        // человека на первый шаг.
+        guard !isActive, !wasSeen, !steps.isEmpty else { return }
         stepIndex = 0
         isActive = true
     }
