@@ -96,7 +96,7 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            FeedView()
+            FeedView(tourActive: tour.isActive)
                 .tabItem { Label("Лента", systemImage: "square.grid.2x2.fill") }.tag(0)
             ChatsListView()
                 .tabItem { Label("Чаты", systemImage: "bubble.left.and.bubble.right.fill") }.tag(1)

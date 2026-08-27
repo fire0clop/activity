@@ -16,6 +16,12 @@ enum FeedLayout {
 }
 
 struct FeedView: View {
+    /// Идёт обучение. Его шаги объясняют кнопки первой страницы — на «Афише» и
+    /// «Хочу» часть из них скрыта, и подсветка обводила пустое место.
+    let tourActive: Bool
+
+    init(tourActive: Bool = false) { self.tourActive = tourActive }
+
     @EnvironmentObject var auth: AuthManager
     @StateObject private var vm = FeedViewModel()
     @StateObject private var location = LocationManager()
@@ -66,6 +72,8 @@ struct FeedView: View {
                 .background(Color.clear.tourAnchor(TourLayout.content))
             }
             .navigationBarHidden(true)
+            .onAppear { if tourActive { page = 0 } }
+            .onChange(of: tourActive) { _, active in if active { page = 0 } }
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
             .task {
                 vm.configure(auth.api)
