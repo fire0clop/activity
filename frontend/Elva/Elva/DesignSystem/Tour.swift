@@ -76,6 +76,13 @@ final class TourController: ObservableObject {
 /// Содержание обучения по ленте. Живёт отдельно от экрана, потому что показывает
 /// его корневой контейнер: подсветка обязана накрывать и таб-бар, а он лежит выше
 /// вкладки — изнутри вкладки его не перекрыть, и кнопки обучения оказывались под ним.
+enum TourLayout {
+    /// Якорь на область вкладки без панели снизу. Панель вкладок в iOS 26 плавающая
+    /// и живёт в своём слое поверх любых наложений — накрыть её нельзя, а кнопки
+    /// пояснения, заехавшие под неё, просто перестают нажиматься.
+    static let content = "tour.content"
+}
+
 enum FeedTour {
     static let storageKey = "tour.feed.v1"
 
@@ -114,6 +121,8 @@ struct TourOverlay: View {
     let step: TourStep
     /// Кадр подсвечиваемого элемента; nil — шаг без привязки к элементу.
     let target: CGRect?
+    /// Нижняя граница, ниже которой пояснение размещать нельзя: там панель вкладок.
+    let bottomLimit: CGFloat
     let index: Int
     let total: Int
     let onNext: () -> Void
@@ -136,14 +145,18 @@ struct TourOverlay: View {
         GeometryReader { proxy in
             let cut = hole(in: proxy.size)
             ZStack(alignment: .topLeading) {
-                // Затемнение только гасит фон и не ловит нажатий. Раньше на нём висел
-                // жест «тап = дальше»: он срабатывал вместе с кнопкой, шаг проскакивал
-                // через один, а с края экрана обучение схлопывалось за одно касание.
-                // Управление осталось за кнопками — они однозначны.
+                // Тап мимо пояснения закрывает обучение. Это не «следующий шаг»:
+                // такой жест срабатывал вместе с кнопкой и проскакивал шаг. И это
+                // не глухой слой: пока подсветка висит поверх всего приложения,
+                // без выхода наружу человек оказывался заперт — вкладки нажимались,
+                // но не переключались, и это читалось как «ничего не работает».
                 dimming(cut, in: proxy.size)
-                    .allowsHitTesting(false)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onSkip() }
                 if let cut { ring(cut) }
-                calloutLayout(cut, in: proxy.size).zIndex(1)
+                calloutLayout(cut, in: proxy.size)
+                    .frame(width: proxy.size.width, height: max(bottomLimit, 200), alignment: .top)
+                    .zIndex(1)
             }
             .ignoresSafeArea()
         }
@@ -271,6 +284,8 @@ private struct TourHost: View {
                 TourOverlay(
                     step: step,
                     target: anchors[step.id].map { proxy[$0] },
+                    bottomLimit: anchors[TourLayout.content].map { proxy[$0].maxY }
+                        ?? proxy.size.height,
                     index: controller.stepIndex,
                     total: controller.steps.count,
                     onNext: { controller.next() },
