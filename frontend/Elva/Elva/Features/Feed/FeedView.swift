@@ -37,6 +37,12 @@ struct FeedView: View {
 
     private let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
+    /// В UI-тестах точку задаём заранее: системный запрос геопозиции и следом
+    /// выбор города перехватывают экран и делают прогон нестабильным.
+    private var skipLocation: Bool {
+        ProcessInfo.processInfo.environment["UITEST_SKIP_LOCATION"] != nil
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -55,16 +61,15 @@ struct FeedView: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .animation(.easeInOut(duration: 0.2), value: page)
                 }
+                // Замеряем зону вкладки без панели снизу — обучение по ней понимает,
+                // докуда можно опускать пояснение, чтобы кнопки остались нажимаемыми.
+                .background(Color.clear.tourAnchor(TourLayout.content))
             }
             .navigationBarHidden(true)
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
             .task {
                 vm.configure(auth.api)
-                // В UI-тестах системный запрос геопозиции перехватывает экран и делает
-                // прогон нестабильным — там точку задаём заранее.
-                if ProcessInfo.processInfo.environment["UITEST_SKIP_LOCATION"] == nil {
-                    location.request()
-                }
+                if !skipLocation { location.request() }
                 if vm.items.isEmpty { await vm.refresh() }
             }
             .onReceive(location.$coordinate.compactMap { $0 }) { c in
@@ -73,7 +78,7 @@ struct FeedView: View {
             }
             .onReceive(location.$denied) { denied in
                 // Геолокация запрещена и город не выбран — предлагаем выбрать вручную.
-                if denied, vm.manualCity == nil { showCityPicker = true }
+                if denied, vm.manualCity == nil, !skipLocation { showCityPicker = true }
             }
             .sheet(isPresented: $showSubscriptions) {
                 SubscriptionsView(latitude: vm.latitude, longitude: vm.longitude,
