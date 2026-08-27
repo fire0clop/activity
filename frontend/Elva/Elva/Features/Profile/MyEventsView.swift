@@ -6,6 +6,7 @@ struct MyEventsView: View {
     @State private var items: [EventListItem] = []
     @State private var isLoading = true
     @State private var errorText: String?
+    @State private var hasLoaded = false
 
     var body: some View {
         ZStack {
@@ -33,6 +34,9 @@ struct MyEventsView: View {
         .navigationTitle("Мои события")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        // Возврат с карточки — не первое появление: .task тут уже не сработает,
+        // а список мог измениться (событие удалено, заявка принята).
+        .onAppear { if hasLoaded { Task { await load(silent: true) } } }
     }
 
     private func row(_ item: EventListItem) -> some View {
@@ -93,9 +97,9 @@ struct MyEventsView: View {
         }
     }
 
-    private func load() async {
-        isLoading = true
-        defer { isLoading = false }
+    private func load(silent: Bool = false) async {
+        if !silent { isLoading = true }
+        defer { isLoading = false; hasLoaded = true }
         do {
             let resp: EventListResponse = try await auth.api.send(Endpoint(path: "/events/mine"))
             items = resp.items

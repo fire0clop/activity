@@ -71,3 +71,34 @@ async def test_attendance_counted_on_finish_not_on_accept(client, user_factory) 
     # Повторный finish не должен задваивать посещение.
     await client.post(f"/events/{event_id}/finish", headers=org["headers"])
     assert await _attended(client, guest["headers"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_deleted_event_leaves_my_events(client, user_factory) -> None:
+    """Удалил своё событие — его больше нет в списке.
+
+    Удаление у нас мягкое (status=cancelled), и раньше событие продолжало висеть
+    в «Моих событиях». Со стороны это выглядело так, будто кнопка не работает.
+    """
+    org = await user_factory("Орг")
+    event_id = (await client.post("/events", headers=org["headers"],
+                                  json=_event_body())).json()["id"]
+    assert (await client.get("/events/mine", headers=org["headers"])).json()["items"]
+
+    assert (await client.delete(f"/events/{event_id}",
+                                headers=org["headers"])).status_code == 204
+    assert (await client.get("/events/mine", headers=org["headers"])).json()["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_participant_still_sees_cancelled_event(client, user_factory) -> None:
+    """А вот участнику отмену показываем: ему важно знать, что встречи не будет."""
+    org = await user_factory("Орг")
+    guest = await user_factory("Гость")
+    event_id = (await client.post("/events", headers=org["headers"],
+                                  json=_event_body())).json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=guest["headers"])
+    await client.delete(f"/events/{event_id}", headers=org["headers"])
+
+    items = (await client.get("/events/mine", headers=guest["headers"])).json()["items"]
+    assert [i["status"] for i in items] == ["cancelled"]

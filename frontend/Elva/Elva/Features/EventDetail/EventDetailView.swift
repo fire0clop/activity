@@ -10,6 +10,7 @@ struct EventDetailView: View {
     @State private var actionLoading = false
     @State private var errorText: String?
     @State private var showEdit = false
+    @State private var deleted = false
     @State private var showReport = false
     @State private var reportStatus: String?
     @State private var photoPage = 0
@@ -45,8 +46,12 @@ struct EventDetailView: View {
             }
         }
         .navigationBarHidden(true)
-        .sheet(isPresented: $showEdit) {
-            if let e = event { EventEditView(event: e) { Task { await load() } } }
+        // Закрываем карточку в onDismiss, а не сразу: два одновременных закрытия
+        // (лист и экран) SwiftUI разыгрывает как гонку и одно из них теряется.
+        .sheet(isPresented: $showEdit, onDismiss: { if deleted { dismiss() } }) {
+            if let e = event {
+                EventEditView(event: e, onDeleted: { deleted = true }) { Task { await load() } }
+            }
         }
         .fullScreenCover(isPresented: $fullScreen) {
             FullScreenPhotoView(images: event?.images ?? [], start: photoPage)

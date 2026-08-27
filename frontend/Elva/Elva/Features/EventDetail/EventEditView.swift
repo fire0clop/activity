@@ -3,6 +3,9 @@ import SwiftUI
 
 struct EventEditView: View {
     let event: EventDetail
+    /// Событие удалено: карточку под этим окном тоже нужно закрыть, иначе человек
+    /// остаётся смотреть на то, чего уже нет, и удаление выглядит как бездействие.
+    var onDeleted: () -> Void
     var onChanged: () -> Void
     @EnvironmentObject var auth: AuthManager
     @Environment(\.dismiss) private var dismiss
@@ -23,8 +26,10 @@ struct EventEditView: View {
     @State private var errorText: String?
     @State private var confirmDelete = false
 
-    init(event: EventDetail, onChanged: @escaping () -> Void) {
+    init(event: EventDetail, onDeleted: @escaping () -> Void = {},
+         onChanged: @escaping () -> Void) {
         self.event = event
+        self.onDeleted = onDeleted
         self.onChanged = onChanged
         _title = State(initialValue: event.title)
         _description = State(initialValue: event.description ?? "")
@@ -189,7 +194,7 @@ struct EventEditView: View {
         defer { isLoading = false }
         do {
             try await auth.api.sendVoid(Endpoint(path: "/events/\(event.id)", method: .delete))
-            onChanged(); dismiss()
+            onDeleted(); dismiss()
         } catch let err as APIError { errorText = err.message }
         catch { errorText = "Не удалось удалить событие" }
     }
