@@ -3,7 +3,7 @@ from datetime import UTC, datetime, time, timedelta
 
 from fastapi import APIRouter, File, Query, UploadFile, status
 from geoalchemy2 import Geography
-from sqlalchemy import String, cast, func, or_, select, tuple_
+from sqlalchemy import Float, String, cast, func, literal, or_, select, tuple_
 
 from app.core.config import settings
 from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
@@ -162,8 +162,10 @@ async def create_event(
 async def list_events(
     current_user: CurrentUser,
     db: DbSession,
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
+    # Без координат — режим «везде»: лента не привязана к городу и показывает всё.
+    # Порядок выдачи и так по дате, геометрия была только фильтром.
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
     radius_km: float = Query(10, gt=0, le=500),
     when: str | None = Query(None, pattern="^(today|tomorrow|weekend)$"),
     date_from: datetime | None = Query(None, alias="from"),
@@ -174,8 +176,16 @@ async def list_events(
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = None,
 ) -> EventListOut:
-    point = cast(func.ST_SetSRID(func.ST_MakePoint(lng, lat), 4326), Geography())
-    distance_m = func.ST_Distance(Event.location, point).label("distance_m")
+    everywhere = lat is None or lng is None
+    point = (
+        None if everywhere
+        else cast(func.ST_SetSRID(func.ST_MakePoint(lng, lat), 4326), Geography())
+    )
+    # «Везде» — расстояние считать не от чего, в карточке его просто не будет.
+    distance_m = (
+        literal(None, type_=Float).label("distance_m") if everywhere
+        else func.ST_Distance(Event.location, point).label("distance_m")
+    )
 
     # Агрегаты одним запросом (без N+1): кол-во accepted и мой статус — коррелированными подзапросами.
     accepted_sq = (
@@ -225,7 +235,8 @@ async def list_events(
     stmt = (
         select(Event, User, distance_m, accepted_sq.label("cnt"), my_status_sq.label("my"))
         .join(User, User.id == Event.organizer_id)
-        .where(func.ST_DWithin(Event.location, point, radius_km * 1000), *filters)
+        .where(*([] if everywhere else [func.ST_DWithin(Event.location, point, radius_km * 1000)]),
+               *filters)
         .order_by(Event.starts_at.asc(), Event.id.asc())
         .limit(limit + 1)
     )
@@ -248,7 +259,7 @@ async def list_events(
     # радиус, где события есть, чтобы пользователь в пустом городе не видел только заглушку.
     suggested_radius_km: float | None = None
     suggested_count: int | None = None
-    if not items and cursor is None:
+    if not items and cursor is None and not everywhere:
         for probe in (50.0, 200.0, 500.0):
             if probe <= radius_km:
                 continue

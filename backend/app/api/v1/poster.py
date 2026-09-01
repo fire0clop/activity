@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query, status
 from geoalchemy2 import Geography
-from sqlalchemy import cast, func, or_, select
+from sqlalchemy import Float, cast, func, literal, or_, select
 
 from app.api.v1.admin import AdminGuard
 from app.core.deps import CurrentUser, DbSession
@@ -55,8 +55,9 @@ def _build(poster: PosterEvent, *, distance_km: float | None, gatherings: int) -
 async def list_poster(
     _: CurrentUser,
     db: DbSession,
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
+    # Без координат — режим «везде»: та же лента, но без привязки к городу.
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
     radius_km: float = Query(50, gt=0, le=500),
     category: str | None = None,
     when: str | None = Query(None, pattern="^(today|tomorrow|weekend|week)$"),
@@ -67,8 +68,15 @@ async def list_poster(
 ) -> PosterOut:
     """Что идёт рядом. Радиус шире, чем у событий: на концерт ездят дальше, чем гулять."""
     offset = decode_cursor(cursor)
-    point = cast(func.ST_SetSRID(func.ST_MakePoint(lng, lat), 4326), Geography())
-    distance_m = func.ST_Distance(PosterEvent.location, point).label("distance_m")
+    everywhere = lat is None or lng is None
+    point = (
+        None if everywhere
+        else cast(func.ST_SetSRID(func.ST_MakePoint(lng, lat), 4326), Geography())
+    )
+    distance_m = (
+        literal(None, type_=Float).label("distance_m") if everywhere
+        else func.ST_Distance(PosterEvent.location, point).label("distance_m")
+    )
 
     gatherings_sq = (
         select(func.count())
@@ -81,8 +89,9 @@ async def list_poster(
     filters = [
         PosterEvent.status == "published",
         PosterEvent.starts_at >= datetime.now(UTC),
-        func.ST_DWithin(PosterEvent.location, point, radius_km * 1000),
     ]
+    if not everywhere:
+        filters.append(func.ST_DWithin(PosterEvent.location, point, radius_km * 1000))
     if category:
         filters.append(PosterEvent.category == category)
     if free_only:
@@ -120,7 +129,9 @@ async def list_poster(
     rows = rows[:limit]
     return PosterOut(
         items=[
-            _build(p, distance_km=round(float(dist) / 1000, 1), gatherings=int(g))
+            _build(p,
+                   distance_km=round(float(dist) / 1000, 1) if dist is not None else None,
+                   gatherings=int(g))
             for p, dist, g in rows
         ],
         next_cursor=encode_cursor(offset + limit) if has_more else None,

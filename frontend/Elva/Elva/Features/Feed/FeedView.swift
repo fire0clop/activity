@@ -61,7 +61,9 @@ struct FeedView: View {
                     TabView(selection: $page) {
                         activitiesPage.tag(0)
                         posterPage.tag(1)
-                        RequestsView(coordinate: center, areaHint: vm.manualCity?.name,
+                        RequestsView(coordinate: center,
+                                     everywhere: vm.scope == .everywhere,
+                                     areaHint: vm.manualCity?.name,
                                      embedded: true, showCreate: $showCreateRequest).tag(2)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
@@ -77,7 +79,10 @@ struct FeedView: View {
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
             .task {
                 vm.configure(auth.api)
-                if !skipLocation { location.request() }
+                // Разрешение спрашиваем только когда оно нужно. По умолчанию лента
+                // показывает все города, и просить геопозицию на первом запуске
+                // не за что — это раздражает и снижает согласие.
+                if !skipLocation, vm.scope == .nearMe { location.request() }
                 if vm.items.isEmpty { await vm.refresh() }
             }
             .onReceive(location.$coordinate.compactMap { $0 }) { c in
@@ -86,7 +91,7 @@ struct FeedView: View {
             }
             .onReceive(location.$denied) { denied in
                 // Геолокация запрещена и город не выбран — предлагаем выбрать вручную.
-                if denied, vm.manualCity == nil, !skipLocation { showCityPicker = true }
+                if denied, vm.scope == .nearMe, !skipLocation { showCityPicker = true }
             }
             .sheet(isPresented: $showSubscriptions) {
                 SubscriptionsView(latitude: vm.latitude, longitude: vm.longitude,
@@ -96,9 +101,11 @@ struct FeedView: View {
                 FiltersSheet(filters: $filters) { applyFilters() }
             }
             .sheet(isPresented: $showCityPicker) {
-                CityPickerView(selected: vm.manualCity, locationDenied: location.denied) { city in
-                    vm.selectCity(city)
-                    if city == nil { location.request() }
+                CityPickerView(scope: vm.scope, locationDenied: location.denied) { picked in
+                    vm.select(picked)
+                    // Спрашиваем доступ только когда человек сам выбрал «моё
+                    // местоположение» — в остальных режимах он не нужен.
+                    if picked == .nearMe { location.request() }
                 }
             }
         }
@@ -119,7 +126,7 @@ struct FeedView: View {
     @ViewBuilder
     private var posterPage: some View {
         if isMap { mapView } else {
-            PosterFeedView(coordinate: center) { withAnimation { page = 0 } }
+            PosterFeedView(coordinate: center, everywhere: vm.scope == .everywhere) { withAnimation { page = 0 } }
         }
     }
 
@@ -216,13 +223,13 @@ struct FeedView: View {
                 Button { showCityPicker = true } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.and.ellipse").font(.system(size: 11, weight: .heavy))
-                        Text(vm.manualCity?.name.uppercased() ?? "СОБЫТИЯ РЯДОМ")
+                        Text(vm.scope.title.uppercased())
                             .font(.system(size: 12, weight: .heavy)).tracking(1.5)
                         Image(systemName: "chevron.down").font(.system(size: 9, weight: .heavy))
                     }
                     .foregroundStyle(Theme.accentInk)
                 }
-                .accessibilityLabel("Город: \(vm.manualCity?.name ?? "моё местоположение")")
+                .accessibilityLabel("Показываем: \(vm.scope.title)")
                 .accessibilityHint("Выбрать другой город")
                 Text(Self.titles[page])
                     .font(.display(28)).foregroundStyle(Theme.ink)

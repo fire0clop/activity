@@ -9,6 +9,8 @@ import SwiftUI
 /// отсюда пустая лента наполняется первой.
 struct RequestsView: View {
     let coordinate: CLLocationCoordinate2D
+    /// Лента не привязана к городу — координаты не отправляем.
+    var everywhere = false
     var areaHint: String?
     /// Внутри страницы ленты свой заголовок и тулбар не нужны — они уже есть сверху.
     var embedded: Bool = false
@@ -164,8 +166,10 @@ struct RequestsView: View {
         do {
             let resp: CompanyRequestsResponse = try await auth.api.send(Endpoint(
                 path: "/requests",
-                query: ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
-                        "radius_km": "25"]))
+                query: everywhere
+                    ? [:]
+                    : ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
+                       "radius_km": "25"]))
             items = resp.items
             errorText = nil; loadFailed = false
         } catch let err as APIError {
