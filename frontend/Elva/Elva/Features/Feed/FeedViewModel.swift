@@ -1,5 +1,29 @@
 import Foundation
 
+/// Что показывает лента.
+///
+/// По умолчанию — всё подряд, без привязки к городу. У молодого продукта событий
+/// мало, и лента, отфильтрованная по десяти километрам вокруг, у большинства
+/// оказывается пустой. Сузить до своего города или своей точки человек может сам.
+enum FeedScope: Equatable {
+    case everywhere
+    case nearMe
+    case city(City)
+
+    var city: City? {
+        if case .city(let c) = self { return c }
+        return nil
+    }
+
+    var title: String {
+        switch self {
+        case .everywhere: return "Все города"
+        case .nearMe: return "Моё местоположение"
+        case .city(let c): return c.name
+        }
+    }
+}
+
 /// Город для ручного выбора точки ленты (когда геолокация запрещена или не нужна).
 struct City: Codable, Equatable, Identifiable {
     let name: String
@@ -24,8 +48,10 @@ final class FeedViewModel: ObservableObject {
     @Published var query: String = ""
     @Published var radiusKm: Double = 30
 
-    /// Город, выбранный вручную; nil — используем геолокацию.
-    @Published private(set) var manualCity: City?
+    @Published private(set) var scope: FeedScope = .everywhere
+
+    /// Город, выбранный вручную; nil — лента не привязана к конкретному городу.
+    var manualCity: City? { scope.city }
 
     // Координаты (по умолчанию центр Москвы, пока нет ни геолокации, ни города)
     private(set) var latitude = 55.751
@@ -34,35 +60,51 @@ final class FeedViewModel: ObservableObject {
     private var nextCursor: String?
     private var api: APIClient?
     private let cityKey = "feed.manualCity"
+    private let scopeKey = "feed.scope"
 
     init() {
-        if let data = UserDefaults.standard.data(forKey: cityKey),
-           let city = try? JSONDecoder().decode(City.self, from: data) {
-            manualCity = city
-            latitude = city.latitude
-            longitude = city.longitude
+        switch UserDefaults.standard.string(forKey: scopeKey) {
+        case "nearMe":
+            scope = .nearMe
+        case "city":
+            if let data = UserDefaults.standard.data(forKey: cityKey),
+               let city = try? JSONDecoder().decode(City.self, from: data) {
+                scope = .city(city)
+                latitude = city.latitude
+                longitude = city.longitude
+            }
+        default:
+            break   // ничего не выбирали — показываем всё
         }
     }
 
     func configure(_ api: APIClient) { self.api = api }
 
-    /// Координата от GPS. Игнорируется, если пользователь выбрал город вручную.
+    /// Координата от GPS. Игнорируется, если выбран конкретный город.
+    ///
+    /// В режиме «все города» точка всё равно нужна: от неё создаются события
+    /// и желания, и по ней центрируется карта.
     func setCoordinate(lat: Double, lng: Double) {
-        guard manualCity == nil else { return }
+        guard scope.city == nil else { return }
         latitude = lat
         longitude = lng
     }
 
-    /// Ручной выбор города; nil — вернуться к геолокации.
-    func selectCity(_ city: City?) {
-        manualCity = city
-        if let city {
+    func select(_ newScope: FeedScope) {
+        scope = newScope
+        switch newScope {
+        case .city(let city):
             latitude = city.latitude
             longitude = city.longitude
+            UserDefaults.standard.set("city", forKey: scopeKey)
             if let data = try? JSONEncoder().encode(city) {
                 UserDefaults.standard.set(data, forKey: cityKey)
             }
-        } else {
+        case .nearMe:
+            UserDefaults.standard.set("nearMe", forKey: scopeKey)
+            UserDefaults.standard.removeObject(forKey: cityKey)
+        case .everywhere:
+            UserDefaults.standard.set("everywhere", forKey: scopeKey)
             UserDefaults.standard.removeObject(forKey: cityKey)
         }
         Task { await refresh() }
@@ -104,12 +146,14 @@ final class FeedViewModel: ObservableObject {
         defer { isLoading = false }
         let trimmedQuery = query.trimmingCharacters(in: .whitespaces)
         do {
+            // Без координат сервер отдаёт всё подряд — это и есть «все города».
+            let everywhere = scope == .everywhere
             let resp: EventListResponse = try await api.send(Endpoint(
                 path: "/events",
                 query: [
-                    "lat": String(latitude),
-                    "lng": String(longitude),
-                    "radius_km": String(radiusKm),
+                    "lat": everywhere ? nil : String(latitude),
+                    "lng": everywhere ? nil : String(longitude),
+                    "radius_km": everywhere ? nil : String(radiusKm),
                     "when": when,
                     "category": category.isEmpty ? nil : category,
                     "free_only": freeOnly ? "true" : nil,

@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Выбор города для ленты — когда геолокация запрещена или хочется посмотреть другой город.
 struct CityPickerView: View {
-    let selected: City?
+    let scope: FeedScope
     let locationDenied: Bool
-    var onSelect: (City?) -> Void
+    var onSelect: (FeedScope) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
 
@@ -42,26 +42,43 @@ struct CityPickerView: View {
                         .font(.footnote).foregroundStyle(Theme.ink2)
                         .listRowBackground(Theme.accentSoft)
                 }
+                // Всё подряд — состояние по умолчанию: в пустом городе лента,
+                // сужённая до своего района, показывает только заглушку.
                 Button {
-                    onSelect(nil); dismiss()
+                    onSelect(.everywhere); dismiss()
+                } label: {
+                    HStack {
+                        Label("Все города", systemImage: "globe")
+                            .foregroundStyle(Theme.ink)
+                        Spacer()
+                        if scope == .everywhere {
+                            Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                        }
+                    }
+                }
+
+                Button {
+                    onSelect(.nearMe); dismiss()
                 } label: {
                     HStack {
                         Label("Моё местоположение", systemImage: "location.fill")
                             .foregroundStyle(locationDenied ? Theme.ink2 : Theme.ink)
                         Spacer()
-                        if selected == nil { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                        if scope == .nearMe {
+                            Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                        }
                     }
                 }
                 .disabled(locationDenied)
 
                 ForEach(filtered) { city in
                     Button {
-                        onSelect(city); dismiss()
+                        onSelect(.city(city)); dismiss()
                     } label: {
                         HStack {
                             Text(city.name).foregroundStyle(Theme.ink)
                             Spacer()
-                            if selected == city { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                            if scope == .city(city) { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
                         }
                     }
                 }

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, status
 from geoalchemy2 import Geography
-from sqlalchemy import cast, func, select
+from sqlalchemy import Float, cast, func, literal, select
 
 from app.core.config import settings
 from app.core.deps import CompleteUser, CurrentUser, DbSession, RedisDep
@@ -81,8 +81,9 @@ async def create_request(
 async def list_requests(
     current_user: CurrentUser,
     db: DbSession,
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
+    # Без координат — режим «везде»: та же лента, но без привязки к городу.
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
     radius_km: float = Query(25, gt=0, le=500),
     category: str | None = None,
     limit: int = Query(20, ge=1, le=100),
@@ -90,8 +91,15 @@ async def list_requests(
 ) -> RequestsOut:
     """Живой спрос рядом: чего люди хотят, но пока никто не организовал."""
     offset = decode_cursor(cursor)
-    point = cast(func.ST_SetSRID(func.ST_MakePoint(lng, lat), 4326), Geography())
-    distance_m = func.ST_Distance(CompanyRequest.location, point).label("distance_m")
+    everywhere = lat is None or lng is None
+    point = (
+        None if everywhere
+        else cast(func.ST_SetSRID(func.ST_MakePoint(lng, lat), 4326), Geography())
+    )
+    distance_m = (
+        literal(None, type_=Float).label("distance_m") if everywhere
+        else func.ST_Distance(CompanyRequest.location, point).label("distance_m")
+    )
 
     supports_sq = (
         select(func.count())
@@ -114,8 +122,9 @@ async def list_requests(
     filters = [
         CompanyRequest.status == "open",
         CompanyRequest.expires_at > datetime.now(UTC),
-        func.ST_DWithin(CompanyRequest.location, point, radius_km * 1000),
     ]
+    if not everywhere:
+        filters.append(func.ST_DWithin(CompanyRequest.location, point, radius_km * 1000))
     blocked = await matching_service.blocked_user_ids(db, current_user.id)
     if blocked:
         filters.append(CompanyRequest.author_id.notin_(blocked))
@@ -138,7 +147,9 @@ async def list_requests(
     rows = rows[:limit]
     items = [
         _build(req, author, viewer_id=current_user.id, supports=int(supports),
-               i_support=bool(mine), distance_km=round(float(dist) / 1000, 2))
+               i_support=bool(mine),
+               # В режиме «везде» расстояния нет — считать его не от чего.
+               distance_km=round(float(dist) / 1000, 2) if dist is not None else None)
         for req, author, dist, supports, mine in rows
     ]
     return RequestsOut(

@@ -29,12 +29,18 @@ struct FeedViewModelTests {
         return (vm, store)
     }
 
-    @Test("refresh загружает события и передаёт координаты в запрос")
+    @Test("В режиме «моё местоположение» refresh передаёт координаты в запрос")
     func refreshLoadsItems() async throws {
         let (vm, store) = makeVM()
-        defer { store.clear() }
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+        }
         MockURLProtocol.handler = { _ in (200, #"{"items":[\#(Self.itemJSON)],"next_cursor":null}"#) }
 
+        // Лента по умолчанию не привязана к городу, поэтому режим задаём явно:
+        // координаты уходят только когда человек сам сузил выдачу.
+        vm.select(.nearMe)
         vm.setCoordinate(lat: 59.93, lng: 30.33)
         await vm.refresh()
 
@@ -61,11 +67,15 @@ struct FeedViewModelTests {
     @Test("Ручной город приоритетнее GPS и переживает пересоздание")
     func manualCityWinsAndPersists() async {
         let (vm, store) = makeVM()
-        defer { store.clear(); UserDefaults.standard.removeObject(forKey: "feed.manualCity") }
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.manualCity")
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+        }
         MockURLProtocol.handler = { _ in (200, #"{"items":[],"next_cursor":null}"#) }
 
         let sochi = City(name: "Сочи", latitude: 43.6028, longitude: 39.7342)
-        vm.selectCity(sochi)
+        vm.select(.city(sochi))
         vm.setCoordinate(lat: 55.75, lng: 37.61)   // GPS должен игнорироваться
         #expect(vm.latitude == sochi.latitude)
         #expect(vm.longitude == sochi.longitude)
@@ -76,8 +86,59 @@ struct FeedViewModelTests {
         #expect(vm2.latitude == sochi.latitude)
 
         // Сброс на геолокацию
-        vm.selectCity(nil)
+        vm.select(.nearMe)
         #expect(vm.manualCity == nil)
-        #expect(FeedViewModel().manualCity == nil)
+        #expect(FeedViewModel().scope == .nearMe)
+    }
+
+    @Test("По умолчанию лента показывает все города")
+    func everywhereIsDefault() async {
+        UserDefaults.standard.removeObject(forKey: "feed.scope")
+        UserDefaults.standard.removeObject(forKey: "feed.manualCity")
+        #expect(FeedViewModel().scope == .everywhere)
+    }
+
+    @Test("В режиме «все города» координаты в запрос не уходят")
+    func everywhereSendsNoCoordinates() async {
+        let (vm, store) = makeVM()
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+        }
+        // Ревью велось из Купертино, а события были в Москве: с координатами
+        // лента оказывалась пустой. Проверяем, что «все города» их не шлёт.
+        var seen: URL?
+        MockURLProtocol.handler = { req in
+            seen = req.url
+            return (200, #"{"items":[],"next_cursor":null}"#)
+        }
+        vm.select(.everywhere)
+        await vm.refresh()
+
+        let query = seen?.query ?? ""
+        #expect(!query.contains("lat="))
+        #expect(!query.contains("lng="))
+        #expect(!query.contains("radius_km="))
+    }
+
+    @Test("С выбранным городом координаты по-прежнему уходят")
+    func cityStillSendsCoordinates() async {
+        let (vm, store) = makeVM()
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+            UserDefaults.standard.removeObject(forKey: "feed.manualCity")
+        }
+        var seen: URL?
+        MockURLProtocol.handler = { req in
+            seen = req.url
+            return (200, #"{"items":[],"next_cursor":null}"#)
+        }
+        vm.select(.city(City(name: "Сочи", latitude: 43.6028, longitude: 39.7342)))
+        await vm.refresh()
+
+        let query = seen?.query ?? ""
+        #expect(query.contains("lat=43.6028"))
+        #expect(query.contains("lng=39.7342"))
     }
 }

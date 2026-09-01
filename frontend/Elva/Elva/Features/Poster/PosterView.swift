@@ -9,6 +9,8 @@ import SwiftUI
 /// компанию — так чужое мероприятие втягивается в основной цикл продукта.
 struct PosterFeedView: View {
     let coordinate: CLLocationCoordinate2D
+    /// Лента не привязана к городу — координаты не отправляем.
+    var everywhere = false
     /// Переход на страницу активностей: пустая афиша не должна быть тупиком.
     var onGoToActivities: () -> Void = {}
 
@@ -191,8 +193,10 @@ struct PosterFeedView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        var params = ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
-                      "radius_km": "50"]
+        var params: [String: String] = everywhere
+            ? [:]
+            : ["lat": "\(coordinate.latitude)", "lng": "\(coordinate.longitude)",
+               "radius_km": "50"]
         if !filters.category.isEmpty { params["category"] = filters.category }
         if let when = filters.when { params["when"] = when }
         if filters.freeOnly { params["free_only"] = "true" }
