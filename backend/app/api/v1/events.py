@@ -25,6 +25,7 @@ from app.schemas.user import UserBrief
 from app.services import (
     chat_service,
     connection_service,
+    content_filter,
     event_service,
     matching_service,
     push_service,
@@ -82,6 +83,7 @@ async def create_event(
     )
     if body.starts_at < datetime.now(UTC):
         raise AppError("validation_error", "Время начала должно быть в будущем", 422)
+    content_filter.ensure_clean(body.title, body.description)
 
     # Координаты: из ссылки Яндекс.Карт (точнее) или напрямую.
     lat, lng = body.latitude, body.longitude
@@ -364,6 +366,7 @@ async def update_event(
     event = await db.get(Event, event_id)
     if event is None:
         raise not_found("Событие не найдено")
+    content_filter.ensure_clean(body.title, body.description)
     if event.organizer_id != current_user.id:
         raise forbidden("Только организатор может изменять событие")
 

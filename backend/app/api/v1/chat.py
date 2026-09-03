@@ -9,7 +9,7 @@ from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation, ConversationMember
 from app.models.message import Message
-from app.services import chat_service
+from app.services import chat_service, content_filter
 from app.services.rate_limit import allow_user_action
 from app.ws.manager import manager
 
@@ -103,6 +103,10 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
                         await websocket.send_json(
                             {"type": "error", "code": "forbidden", "detail": "Беседа архивирована"}
                         )
+                        continue
+                    if content_filter.is_objectionable(text):
+                        await ws.send_json({"type": "error", "code": "objectionable_content",
+                                            "message": "Сообщение нарушает правила сообщества"})
                         continue
                     await chat_service.post_message(db2, conversation_id, text, sender_id=user_id)
             elif mtype == "typing":

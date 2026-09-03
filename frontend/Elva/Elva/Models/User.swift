@@ -54,6 +54,7 @@ struct UserPrivate: Decodable {
     let isPhoneVerified: Bool
     let birthDate: String?
     let profileCompleted: Bool
+    let tosAcceptedVersion: String?
 
     var noShows: Int { noShowCount ?? 0 }
 
@@ -70,6 +71,7 @@ struct UserPrivate: Decodable {
         case isPhoneVerified = "is_phone_verified"
         case birthDate = "birth_date"
         case profileCompleted = "profile_completed"
+        case tosAcceptedVersion = "tos_accepted_version"
     }
 }
 

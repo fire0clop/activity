@@ -12,7 +12,7 @@ from app.models.request import CompanyRequest, RequestSupport
 from app.models.user import User
 from app.schemas.request import RequestCreateIn, RequestItem, RequestsOut, SupportOut
 from app.schemas.user import UserBrief
-from app.services import matching_service, request_service
+from app.services import content_filter, matching_service, request_service
 from app.services.pagination import decode_cursor, encode_cursor
 from app.services.rate_limit import check_user_action
 
@@ -57,6 +57,7 @@ async def create_request(
     await check_user_action(
         redis, current_user.id, "create_request", settings.user_rl_requests_per_hour, 3600
     )
+    content_filter.ensure_clean(body.text)
     req = CompanyRequest(
         author_id=current_user.id,
         category=body.category,

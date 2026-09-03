@@ -141,4 +141,63 @@ struct FeedViewModelTests {
         #expect(query.contains("lat=43.6028"))
         #expect(query.contains("lng=39.7342"))
     }
+
+    @Test("Геопозиция в городе из списка открывает этот город")
+    func locationInsideKnownCityPicksIt() async {
+        let (vm, store) = makeVM()
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+            UserDefaults.standard.removeObject(forKey: "feed.manualCity")
+        }
+        MockURLProtocol.handler = { _ in (200, #"{"items":[],"next_cursor":null}"#) }
+
+        vm.setCoordinate(lat: 59.93, lng: 30.33)          // Санкт-Петербург
+        #expect(vm.scope == .city(City(name: "Санкт-Петербург",
+                                       latitude: 59.9343, longitude: 30.3351)))
+    }
+
+    @Test("Пригород считается своим городом")
+    func suburbCountsAsCity() async {
+        let (vm, store) = makeVM()
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+            UserDefaults.standard.removeObject(forKey: "feed.manualCity")
+        }
+        MockURLProtocol.handler = { _ in (200, #"{"items":[],"next_cursor":null}"#) }
+
+        // Химки: за границей города, но вечером человек поедет в Москву.
+        vm.setCoordinate(lat: 55.89, lng: 37.43)
+        #expect(vm.manualCity?.name == "Москва")
+    }
+
+    @Test("Вне списка городов остаются все города")
+    func locationOutsideListKeepsEverywhere() async {
+        let (vm, store) = makeVM()
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+        }
+        MockURLProtocol.handler = { _ in (200, #"{"items":[],"next_cursor":null}"#) }
+
+        // Купертино: именно отсюда шло ревью App Store и лента была пустой.
+        vm.setCoordinate(lat: 37.3349, lng: -122.0090)
+        #expect(vm.scope == .everywhere)
+    }
+
+    @Test("Собственный выбор сильнее геопозиции")
+    func explicitChoiceBeatsLocation() async {
+        let (vm, store) = makeVM()
+        defer {
+            store.clear()
+            UserDefaults.standard.removeObject(forKey: "feed.scope")
+            UserDefaults.standard.removeObject(forKey: "feed.manualCity")
+        }
+        MockURLProtocol.handler = { _ in (200, #"{"items":[],"next_cursor":null}"#) }
+
+        vm.select(.everywhere)
+        vm.setCoordinate(lat: 59.93, lng: 30.33)          // сидим в Петербурге
+        #expect(vm.scope == .everywhere)                  // но выбрали «все города»
+    }
 }

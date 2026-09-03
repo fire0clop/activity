@@ -3,6 +3,8 @@ import SwiftUI
 /// Корневой экран: переключает поток по состоянию сессии.
 struct RootView: View {
     @EnvironmentObject var auth: AuthManager
+    /// Версия правил, с которой человек согласился. Пустая — согласия не было.
+    @AppStorage(Terms.storageKey) private var tosAccepted = ""
 
     var body: some View {
         Group {
@@ -25,6 +27,17 @@ struct RootView: View {
 
     @ViewBuilder
     private var signedOutRoot: some View {
+        // Правила показываются до регистрации и входа (App Store 1.2):
+        // без согласия дальше этого экрана не попасть.
+        if tosAccepted != Terms.version {
+            TermsGateView { tosAccepted = Terms.version }
+        } else {
+            authRoot
+        }
+    }
+
+    @ViewBuilder
+    private var authRoot: some View {
         #if DEBUG
         // Headless-скриншоты регистрации: UITEST_ROUTE начинается с "register".
         if ProcessInfo.processInfo.environment["UITEST_ROUTE"]?.hasPrefix("register") == true {

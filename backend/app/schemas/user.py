@@ -54,6 +54,7 @@ class UserPrivate(UserPublic):
     is_phone_verified: bool
     birth_date: date | None
     profile_completed: bool
+    tos_accepted_version: str | None = None
 
     @classmethod
     def from_model(cls, u: User) -> "UserPrivate":
@@ -63,6 +64,7 @@ class UserPrivate(UserPublic):
             is_phone_verified=u.is_phone_verified,
             birth_date=u.birth_date,
             profile_completed=u.profile_completed,
+            tos_accepted_version=u.tos_accepted_version,
         )
 
 
@@ -91,5 +93,7 @@ class UserBrief(BaseModel):
 class UpdateProfileIn(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     bio: str | None = None
+    # Версия правил сообщества, с которой человек согласился на экране входа.
+    tos_accepted_version: str | None = Field(default=None, max_length=20)
     birth_date: date | None = None
     gender: str | None = Field(default=None, pattern="^(male|female|other|unspecified)$")

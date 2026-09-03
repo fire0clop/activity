@@ -9,13 +9,16 @@ final class ProfileUITests: XCTestCase {
         app.launchEnvironment["UITEST_ACCESS_TOKEN"] = ProcessInfo.processInfo.environment["UITEST_ACCESS_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_REFRESH_TOKEN"] = ProcessInfo.processInfo.environment["UITEST_REFRESH_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_SKIP_LOCATION"] = "1"
+        app.launchEnvironment["UITEST_SKIP_PUSH"] = "1"
         // Обучение не должно перекрывать экран во время проверки профиля.
-        app.launchArguments += ["-tour.feed.v1", "YES", "-tour.event.v1", "YES"]
+        app.launchArguments += ["-feed.scope", "nearMe",
+                                "-tour.feed.v1", "YES", "-tour.event.v1", "YES"]
         app.launch()
+        settleAfterLaunch(app)
 
         let profileTab = app.buttons["Профиль"]
-        XCTAssertTrue(profileTab.waitForExistence(timeout: 15), "Вкладка «Профиль» не появилась")
-        profileTab.tap()
+        XCTAssertTrue(waitForApp(profileTab), "Вкладка «Профиль» не появилась")
+        tapWhenReady(profileTab, "вкладка «Профиль»")
         return app
     }
 
@@ -26,8 +29,11 @@ final class ProfileUITests: XCTestCase {
         app.launchEnvironment["UITEST_ACCESS_TOKEN"] = ProcessInfo.processInfo.environment["UITEST_ACCESS_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_REFRESH_TOKEN"] = ProcessInfo.processInfo.environment["UITEST_REFRESH_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_SKIP_LOCATION"] = "1"
-        app.launchArguments += ["-tour.feed.v1", "NO"]   // обучение НЕ пройдено
+        app.launchEnvironment["UITEST_SKIP_PUSH"] = "1"
+        app.launchArguments += ["-feed.scope", "nearMe",
+                                "-tour.feed.v1", "NO"]   // обучение НЕ пройдено
         app.launch()
+        settleAfterLaunch(app)
 
         XCTAssertTrue(app.staticTexts["Здесь три ленты"].waitForExistence(timeout: 15),
                       "Обучение не появилось")
@@ -35,12 +41,12 @@ final class ProfileUITests: XCTestCase {
         // Первый тап мимо пояснения закрывает обучение — из него всегда есть выход.
         let profileTab = app.buttons["Профиль"]
         XCTAssertTrue(profileTab.waitForExistence(timeout: 5))
-        profileTab.tap()
+        tapWhenReady(profileTab, "вкладка «Профиль»")
         XCTAssertFalse(app.staticTexts["Здесь три ленты"].waitForExistence(timeout: 2),
                        "Тап мимо пояснения не закрыл обучение — человек заперт в нём")
 
         // Второй открывает вкладку: приложение снова управляемо.
-        profileTab.tap()
+        tapWhenReady(profileTab, "вкладка «Профиль»")
         let row = app.buttons["Как это работает"]
         XCTAssertTrue(row.waitForExistence(timeout: 5), "Профиль не открылся")
         XCTAssertTrue(row.isHittable,
@@ -50,9 +56,7 @@ final class ProfileUITests: XCTestCase {
     func testHowItWorksShowsConfirmation() throws {
         let app = openProfile()
         let row = app.buttons["Как это работает"]
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "Строки «Как это работает» нет")
-        XCTAssertTrue(row.isHittable, "Строка есть, но недоступна для нажатия")
-        row.tap()
+        tapWhenReady(row, "строка в профиле", scrollIn: app.scrollViews.firstMatch)
         XCTAssertTrue(app.staticTexts["Подсказки включены"].waitForExistence(timeout: 3),
                       "После нажатия ничего не произошло — подтверждение не показано")
     }
@@ -60,9 +64,7 @@ final class ProfileUITests: XCTestCase {
     func testChangePasswordOpensSheet() throws {
         let app = openProfile()
         let row = app.buttons["Сменить пароль"]
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "Строки «Сменить пароль» нет")
-        XCTAssertTrue(row.isHittable, "Строка есть, но недоступна для нажатия")
-        row.tap()
+        tapWhenReady(row, "строка в профиле", scrollIn: app.scrollViews.firstMatch)
         // Экран восстановления пароля начинается с ввода телефона.
         XCTAssertTrue(app.buttons["Получить код"].waitForExistence(timeout: 3),
                       "После нажатия ничего не произошло — окно смены пароля не открылось")
@@ -84,22 +86,23 @@ final class ProfileUITests: XCTestCase {
         app.launchEnvironment["UITEST_REFRESH_TOKEN"] =
             ProcessInfo.processInfo.environment["UITEST_REFRESH_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_SKIP_LOCATION"] = "1"
+        app.launchEnvironment["UITEST_SKIP_PUSH"] = "1"
+        app.launchArguments += ["-feed.scope", "nearMe"]
         app.launch()
+        settleAfterLaunch(app)
 
-        // Приводим к известному состоянию: обучение пройдено.
+        // Приводим к известному состоянию: обучение пройдено и не мешает.
         let firstStep = app.staticTexts["Здесь три ленты"]
-        if firstStep.waitForExistence(timeout: 10) {
-            app.buttons["tour.skip"].tap()
-            XCTAssertFalse(firstStep.waitForExistence(timeout: 3), "Обучение не закрылось")
-        }
+        clearTourIfShown(app)
+        XCTAssertFalse(firstStep.exists, "Обучение не закрылось")
 
-        app.buttons["Профиль"].tap()
+        tapWhenReady(app.buttons["Профиль"], "вкладка «Профиль»")
         let row = app.buttons["Как это работает"]
         XCTAssertTrue(row.waitForExistence(timeout: 10), "Профиль не открылся")
-        row.tap()
-        app.buttons["Хорошо"].tap()
+        tapWhenReady(row, "строка в профиле", scrollIn: app.scrollViews.firstMatch)
+        tapWhenReady(app.buttons["Хорошо"], "подтверждение")
 
-        app.buttons["Лента"].tap()
+        tapWhenReady(app.buttons["Лента"], "вкладка «Лента»")
         XCTAssertTrue(firstStep.waitForExistence(timeout: 10),
                       "Подсказки включили, но на ленте они не показались")
     }

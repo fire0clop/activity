@@ -79,10 +79,9 @@ struct FeedView: View {
             .navigationDestination(item: $selected) { EventDetailView(eventID: $0.id) }
             .task {
                 vm.configure(auth.api)
-                // Разрешение спрашиваем только когда оно нужно. По умолчанию лента
-                // показывает все города, и просить геопозицию на первом запуске
-                // не за что — это раздражает и снижает согласие.
-                if !skipLocation, vm.scope == .nearMe { location.request() }
+                // Разрешение нужно и в режиме по умолчанию: по координате
+                // определяем, не находится ли человек в одном из городов списка.
+                if !skipLocation { location.request() }
                 if vm.items.isEmpty { await vm.refresh() }
             }
             .onReceive(location.$coordinate.compactMap { $0 }) { c in

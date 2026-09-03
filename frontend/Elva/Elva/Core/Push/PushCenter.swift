@@ -46,6 +46,11 @@ final class PushCenter: ObservableObject {
 
     /// Запрашивает разрешение и регистрирует устройство в APNs.
     func requestAuthorizationAndRegister() {
+        // В UI-тестах системный запрос всплывает поверх экрана в непредсказуемый
+        // момент — уже после входа, когда тест начал работать с интерфейсом. Он
+        // перекрывал кнопки, и прогоны падали с «элемента нет» на каждом втором
+        // запуске. Сами уведомления тесты не проверяют.
+        if ProcessInfo.processInfo.environment["UITEST_SKIP_PUSH"] != nil { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             guard granted else {
                 if let error { NSLog("Push: authorization denied/failed: \(error.localizedDescription)") }
