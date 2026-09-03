@@ -15,15 +15,14 @@ final class TourUITests: XCTestCase {
         app.launchEnvironment["UITEST_ACCESS_TOKEN"] = ProcessInfo.processInfo.environment["UITEST_ACCESS_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_REFRESH_TOKEN"] = ProcessInfo.processInfo.environment["UITEST_REFRESH_TOKEN"] ?? ""
         app.launchEnvironment["UITEST_SKIP_LOCATION"] = "1"
+        app.launchEnvironment["UITEST_SKIP_PUSH"] = "1"
         // Каждый тест стартует с непоказанным обучением: иначе первый же прогон
         // отмечает его просмотренным, и следующим тестам показывать нечего.
-        app.launchArguments += ["-tour.feed.v1", "NO", "-tour.event.v1", "NO"]
+        app.launchArguments += ["-feed.scope", "nearMe",
+                                "-tour.feed.v1", "NO", "-tour.event.v1", "NO"]
         app.launch()
 
-        // Системный запрос геопозиции перекрывает экран — снимаем его.
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let allow = springboard.buttons["При использовании приложения"]
-        if allow.waitForExistence(timeout: 5) { allow.tap() }
+        settleAfterLaunch(app)
         return app
     }
 
@@ -44,7 +43,7 @@ final class TourUITests: XCTestCase {
         XCTAssertTrue(screen.contains(next.frame),
                       "Кнопка «Дальше» выходит за пределы экрана: \(next.frame) вне \(screen)")
 
-        next.tap()
+        tapWhenReady(next, "«Дальше»")
         XCTAssertTrue(app.staticTexts["Сузить выдачу"].waitForExistence(timeout: 3),
                       "После нажатия «Дальше» второй шаг не открылся")
     }

@@ -40,6 +40,11 @@ async def block_user(user_id: uuid.UUID, current_user: CurrentUser, db: DbSessio
     )
     if existing.scalar_one_or_none() is None:
         db.add(Block(blocker_id=current_user.id, blocked_id=user_id))
+        # Блокировка — это ещё и сигнал модерации, а не только личный фильтр
+        # (App Store 1.2: «blocking should also notify the developer»). Кладём
+        # её в ту же очередь разбора, что и жалобы.
+        db.add(Report(reporter_id=current_user.id, target_user_id=user_id,
+                      reason="block", comment="Пользователь заблокирован"))
         await db.commit()
 
 

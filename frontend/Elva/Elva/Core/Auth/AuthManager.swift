@@ -50,6 +50,12 @@ final class AuthManager: ObservableObject {
         // UI-тесты/скриншоты: можно стартовать уже авторизованным, передав токены через
         // окружение запуска (никогда не попадает в релиз — под #if DEBUG).
         let env = ProcessInfo.processInfo.environment
+        // Сессия в связке ключей переживает и переустановку, и соседние тесты.
+        // Тестам входа нужен честный «никто не вошёл» — иначе они попадают в
+        // ленту мимо проверяемых экранов.
+        if env["UITEST_RESET_SESSION"] != nil {
+            tokenStore.clear()
+        }
         if let access = env["UITEST_ACCESS_TOKEN"], let refresh = env["UITEST_REFRESH_TOKEN"] {
             tokenStore.save(access: access, refresh: refresh)
         }
@@ -71,6 +77,7 @@ final class AuthManager: ObservableObject {
                     PushCenter.shared.requestAuthorizationAndRegister()
                 }
             }
+            await recordTermsAcceptanceIfNeeded(me)
         } catch let err as APIError where err.isCode(.unauthorized) {
             signOut()
         } catch {
@@ -164,5 +171,17 @@ final class AuthManager: ObservableObject {
         Task { [api] in
             await api.bestEffortSignOut(refresh: refresh, accessToken: access, deviceToken: deviceToken)
         }
+    }
+
+    /// Фиксирует на сервере версию правил, принятых на экране входа.
+    ///
+    /// Согласие даётся до авторизации, когда учётной записи ещё может не быть, —
+    /// поэтому оно живёт локально и доносится до профиля при первом же входе.
+    private func recordTermsAcceptanceIfNeeded(_ me: UserPrivate) async {
+        let accepted = UserDefaults.standard.string(forKey: Terms.storageKey) ?? ""
+        guard accepted == Terms.version, me.tosAcceptedVersion != Terms.version else { return }
+        struct Body: Encodable { let tos_accepted_version: String }
+        _ = try? await api.sendVoid(Endpoint(path: "/users/me", method: .patch,
+                                             body: Body(tos_accepted_version: Terms.version)))
     }
 }

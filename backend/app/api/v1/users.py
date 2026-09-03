@@ -9,7 +9,7 @@ from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.event import PhotosOut
 from app.schemas.user import UpdateProfileIn, UserPrivate, UserPublic
-from app.services import connection_service
+from app.services import connection_service, content_filter
 from app.services.storage_service import get_storage
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -25,6 +25,7 @@ async def get_me(current_user: CurrentUser) -> UserPrivate:
 @router.patch("/me", response_model=UserPrivate)
 async def update_me(body: UpdateProfileIn, current_user: CurrentUser, db: DbSession) -> UserPrivate:
     data = body.model_dump(exclude_unset=True)
+    content_filter.ensure_clean(data.get("name"), data.get("bio"))
     for field, value in data.items():
         setattr(current_user, field, value)
     await db.commit()

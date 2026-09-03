@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
 
 from app.core.deps import CompleteUser, CurrentUser, DbSession
+from app.services import content_filter
 from app.core.exceptions import AppError, conflict, forbidden, not_found
 from app.models.event import Event
 from app.models.participation import Participation
@@ -56,6 +57,7 @@ async def create_review(
 
     if body.target_id == current_user.id:
         raise forbidden("Нельзя оставить отзыв самому себе")
+    content_filter.ensure_clean(body.comment)
 
     # Отзыв вправе оставить только принятый участник или организатор события.
     is_organizer = event.organizer_id == current_user.id

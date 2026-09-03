@@ -5,6 +5,17 @@ struct ElvaApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var auth = AuthManager()
 
+    init() {
+        #if DEBUG
+        // Для UI-тестов: сброс согласия с правилами. Аргументом запуска это не
+        // делается — домен аргументов перекрывает запись самого приложения, и
+        // после нажатия «Принимаю» чтение возвращало бы старое значение.
+        if ProcessInfo.processInfo.environment["UITEST_RESET_TOS"] != nil {
+            UserDefaults.standard.removeObject(forKey: Terms.storageKey)
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

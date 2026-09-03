@@ -30,6 +30,53 @@ struct City: Codable, Equatable, Identifiable {
     let latitude: Double
     let longitude: Double
     var id: String { name }
+
+    /// Города, между которыми можно переключаться вручную и по которым
+    /// определяется, куда человек попал по геопозиции.
+    static let all: [City] = [
+        City(name: "Москва", latitude: 55.7558, longitude: 37.6173),
+        City(name: "Санкт-Петербург", latitude: 59.9343, longitude: 30.3351),
+        City(name: "Новосибирск", latitude: 55.0084, longitude: 82.9357),
+        City(name: "Екатеринбург", latitude: 56.8389, longitude: 60.6057),
+        City(name: "Казань", latitude: 55.7963, longitude: 49.1088),
+        City(name: "Нижний Новгород", latitude: 56.2965, longitude: 43.9361),
+        City(name: "Челябинск", latitude: 55.1644, longitude: 61.4368),
+        City(name: "Самара", latitude: 53.1959, longitude: 50.1002),
+        City(name: "Омск", latitude: 54.9885, longitude: 73.3242),
+        City(name: "Ростов-на-Дону", latitude: 47.2357, longitude: 39.7015),
+        City(name: "Уфа", latitude: 54.7388, longitude: 55.9721),
+        City(name: "Красноярск", latitude: 56.0153, longitude: 92.8932),
+        City(name: "Воронеж", latitude: 51.6608, longitude: 39.2003),
+        City(name: "Пермь", latitude: 58.0105, longitude: 56.2502),
+        City(name: "Волгоград", latitude: 48.7080, longitude: 44.5133),
+        City(name: "Краснодар", latitude: 45.0355, longitude: 38.9753),
+        City(name: "Сочи", latitude: 43.6028, longitude: 39.7342),
+        City(name: "Тюмень", latitude: 57.1522, longitude: 65.5272),
+    ]
+
+    /// Ближайший город списка, если человек внутри его агломерации.
+    ///
+    /// Радиус щедрый: пригород — это тот же город с точки зрения того, куда
+    /// человек поедет вечером. Если ни один не подходит (например, человек за
+    /// границей), возвращаем nil — лента останется на «всех городах».
+    static func nearest(toLat lat: Double, lng: Double, withinKm limit: Double = 60) -> City? {
+        var best: (city: City, km: Double)?
+        for city in all {
+            let km = distanceKm(lat, lng, city.latitude, city.longitude)
+            if km <= limit, best == nil || km < best!.km { best = (city, km) }
+        }
+        return best?.city
+    }
+
+    private static func distanceKm(_ lat1: Double, _ lng1: Double,
+                                   _ lat2: Double, _ lng2: Double) -> Double {
+        let r = 6371.0
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLng = (lng2 - lng1) * .pi / 180
+        let a = sin(dLat / 2) * sin(dLat / 2)
+            + cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) * sin(dLng / 2) * sin(dLng / 2)
+        return 2 * r * atan2(sqrt(a), sqrt(1 - a))
+    }
 }
 
 @MainActor
@@ -88,6 +135,26 @@ final class FeedViewModel: ObservableObject {
         guard scope.city == nil else { return }
         latitude = lat
         longitude = lng
+        adoptCityFromLocation()
+    }
+
+    /// Человек оказался в городе из списка — открываем сразу его город.
+    ///
+    /// Если ни один город не подходит (другая страна, посёлок вдали от
+    /// перечисленных), остаёмся на «всех городах»: это лучше пустой ленты.
+    /// Собственный выбор человека не трогаем — он всегда сильнее догадки.
+    private func adoptCityFromLocation() {
+        guard !hasExplicitChoice,
+              let city = City.nearest(toLat: latitude, lng: longitude) else { return }
+        scope = .city(city)
+        latitude = city.latitude
+        longitude = city.longitude
+        Task { await refresh() }
+    }
+
+    /// Человек сам выбрал, что показывать. Тогда геопозиция ничего не меняет.
+    private var hasExplicitChoice: Bool {
+        UserDefaults.standard.string(forKey: scopeKey) != nil
     }
 
     func select(_ newScope: FeedScope) {
