@@ -26,6 +26,7 @@ struct LoginView: View {
 
                 VStack(spacing: 12) {
                     TextField("+79991234567", text: $phone)
+                        .onChange(of: phone) { _, raw in phone = PhoneInput.normalize(raw) }
                         .keyboardType(.phonePad).textContentType(.telephoneNumber)
                         .padding().background(Theme.secondaryBg)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))

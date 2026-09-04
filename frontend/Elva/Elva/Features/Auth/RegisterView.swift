@@ -77,6 +77,7 @@ struct RegisterView: View {
         VStack(spacing: 16) {
             header("Ваш номер", "Пришлём код подтверждения в SMS")
             TextField("+79991234567", text: $phone)
+                .onChange(of: phone) { _, raw in phone = PhoneInput.normalize(raw) }
                 .keyboardType(.phonePad).textContentType(.telephoneNumber)
                 .modifier(FieldStyle())
             PrimaryButton(title: "Получить код", isLoading: isLoading, isEnabled: phoneValid) {
