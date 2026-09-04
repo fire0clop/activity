@@ -250,6 +250,9 @@ struct PublicProfileView: View {
                 path: "/users/\(userID)/block", method: blocked ? .post : .delete))
             isBlocked = blocked
             statusText = blocked ? "Пользователь заблокирован." : "Пользователь разблокирован."
+            // Лента и открытые экраны держат его контент в памяти — им нужно
+            // убрать его сразу, не дожидаясь следующего запроса к серверу.
+            if blocked { UserBlocked.post(userID: userID) }
         } catch let err as APIError {
             actionError = err.message
         } catch {

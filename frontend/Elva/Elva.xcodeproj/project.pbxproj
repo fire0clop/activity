@@ -37,6 +37,7 @@
 		48C61193B109C0698EB79675 /* CreateGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E8BB0B9C53C928E677A30D /* CreateGroupView.swift */; };
 		48E479F47FE47D2C82EF1536 /* TermsGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F9C3AEA092979EF1CC6E487 /* TermsGateView.swift */; };
 		4BB7EDDA294F541165474C85 /* DateFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76E9861E8AD9BEB945C498A /* DateFormat.swift */; };
+		4CF61DB47BF00857FD062A96 /* UserBlocked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2870C20D3FFEC8D946F6C8B6 /* UserBlocked.swift */; };
 		54EBB8A812F777259A0FD70A /* PublicProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 576033A0996821947AA4346E /* PublicProfileView.swift */; };
 		550EABF2F7140920E2AD4AB9 /* TourUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F34AF4D73744D32AC8608DC /* TourUITests.swift */; };
 		5889CF0E19FF70356B77DF6B /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EBA54905864FD218993CBF3 /* SubscriptionsView.swift */; };
@@ -58,7 +59,9 @@
 		ABFE3369DF85F1C356E62E24 /* Participation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFC7DF5FC5289179BE7FA1A /* Participation.swift */; };
 		ADD9CE307E2E3E51E1BBFF26 /* PasteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA2B2CB763335E52E275F86 /* PasteUITests.swift */; };
 		AE5D8AFB636D8A7CA2C6D565 /* MyEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC74922BD3083BFB68602B9 /* MyEventsView.swift */; };
+		B4C0D6006D2728809427A58B /* BlockUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A869A07F2BB92E305298F0 /* BlockUITests.swift */; };
 		B9CD4AB39608E8BB0673F14B /* CompanyRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA60770130D2511EBBCBD80 /* CompanyRequest.swift */; };
+		BE542048CBCF10D2FBD009F6 /* DemoVideoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03A238C61AB6EFF082BB5BE /* DemoVideoTests.swift */; };
 		BEA10B1EA8964FAB5030B5E8 /* TokenStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84A11EBC9726B3D74E070EC /* TokenStoreTests.swift */; };
 		BED35B0941418477A2FB40F2 /* PhoneInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97E1952DA20E7EA7A12999F0 /* PhoneInput.swift */; };
 		C37451C3CF4CDD1085878FBA /* Poster.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B88B3621BD09DB4E8CD03C /* Poster.swift */; };
@@ -111,6 +114,7 @@
 		1E9B90ADB6C0C9C443665622 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		24AC64F3488ECFF707CF5BFA /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		25CCE7E1AD3C10EBA2B41352 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
+		2870C20D3FFEC8D946F6C8B6 /* UserBlocked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserBlocked.swift; sourceTree = "<group>"; };
 		29FF10B09F2827CEC08C6C47 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		2DFC7DF5FC5289179BE7FA1A /* Participation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Participation.swift; sourceTree = "<group>"; };
 		2F34AF4D73744D32AC8608DC /* TourUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TourUITests.swift; sourceTree = "<group>"; };
@@ -171,10 +175,12 @@
 		CCF12AB22A726B8017F723BB /* Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chat.swift; sourceTree = "<group>"; };
 		D1E3DB305F15C6FD26219163 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D3838D475F2E221BF628DF64 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D3A869A07F2BB92E305298F0 /* BlockUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockUITests.swift; sourceTree = "<group>"; };
 		D52FC0F1AF5E685EF1F02B02 /* Report.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Report.swift; sourceTree = "<group>"; };
 		D89313267B48B679C3C351C0 /* Endpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoint.swift; sourceTree = "<group>"; };
 		DBC1A8DCCC77AFC3EBD8F24E /* PhoneInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneInputTests.swift; sourceTree = "<group>"; };
 		E017B54ED27545F9DF6A4B63 /* TermsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsUITests.swift; sourceTree = "<group>"; };
+		F03A238C61AB6EFF082BB5BE /* DemoVideoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoVideoTests.swift; sourceTree = "<group>"; };
 		F3EB616829AFA6F34FD371FD /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
 		F4FF7AE8406FDD767B72BC30 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		F685D15CB68D72424D39DA11 /* ProfileUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileUITests.swift; sourceTree = "<group>"; };
@@ -249,6 +255,7 @@
 			isa = PBXGroup;
 			children = (
 				97E1952DA20E7EA7A12999F0 /* PhoneInput.swift */,
+				2870C20D3FFEC8D946F6C8B6 /* UserBlocked.swift */,
 				92AC2BAAFF87BDF58BA4501F /* Auth */,
 				1691E60D4745FDF906E9CCEB /* Extensions */,
 				474362F85B77EA0F3677BA3A /* Location */,
@@ -270,6 +277,8 @@
 		3A2ED5D2CA80FAB6C021A9D0 /* ElvaUITests */ = {
 			isa = PBXGroup;
 			children = (
+				D3A869A07F2BB92E305298F0 /* BlockUITests.swift */,
+				F03A238C61AB6EFF082BB5BE /* DemoVideoTests.swift */,
 				7E9EBD171914F9A2F2F002EB /* EventDeleteUITests.swift */,
 				5BA2B2CB763335E52E275F86 /* PasteUITests.swift */,
 				F685D15CB68D72424D39DA11 /* ProfileUITests.swift */,
@@ -689,6 +698,7 @@
 				3A0C1FF94EFCFD51108E3C2C /* TokenStore.swift in Sources */,
 				04B0D04160C72D81F86D7928 /* Tour.swift in Sources */,
 				FB23AA17EB998021EAB71601 /* User.swift in Sources */,
+				4CF61DB47BF00857FD062A96 /* UserBlocked.swift in Sources */,
 				11805A063B9246222156899E /* WebSocketClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -697,6 +707,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B4C0D6006D2728809427A58B /* BlockUITests.swift in Sources */,
+				BE542048CBCF10D2FBD009F6 /* DemoVideoTests.swift in Sources */,
 				7CDA61EAC69A57B4F3C1C17C /* EventDeleteUITests.swift in Sources */,
 				ADD9CE307E2E3E51E1BBFF26 /* PasteUITests.swift in Sources */,
 				0B98E3006DD5AFDFF4FCCCF3 /* ProfileUITests.swift in Sources */,

@@ -88,6 +88,10 @@ struct RequestsView: View {
             }
         }
         .task(id: locationKey) { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .userBlocked)) { note in
+            guard let id = UserBlocked.userID(from: note) else { return }
+            items.removeAll { $0.author.id == id }
+        }
         .refreshable { await load() }
     }
 

@@ -110,6 +110,12 @@ final class FeedViewModel: ObservableObject {
     private let scopeKey = "feed.scope"
 
     init() {
+        NotificationCenter.default.addObserver(
+            forName: .userBlocked, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let id = UserBlocked.userID(from: note) else { return }
+            Task { @MainActor [weak self] in self?.dropBlocked(organizerID: id) }
+        }
         switch UserDefaults.standard.string(forKey: scopeKey) {
         case "nearMe":
             scope = .nearMe
@@ -126,6 +132,13 @@ final class FeedViewModel: ObservableObject {
     }
 
     func configure(_ api: APIClient) { self.api = api }
+
+    /// Контент заблокированного исчезает мгновенно; фоновое обновление следом
+    /// приводит ленту к серверной правде.
+    private func dropBlocked(organizerID: String) {
+        items.removeAll { $0.organizer.id == organizerID }
+        Task { await refresh() }
+    }
 
     /// Координата от GPS. Игнорируется, если выбран конкретный город.
     ///

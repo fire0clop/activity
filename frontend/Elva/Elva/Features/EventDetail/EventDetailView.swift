@@ -11,6 +11,8 @@ struct EventDetailView: View {
     @State private var errorText: String?
     @State private var showEdit = false
     @State private var deleted = false
+    /// Организатора заблокировали, пока карточка была под другим экраном.
+    @State private var organizerBlocked = false
     @State private var showReport = false
     @State private var reportStatus: String?
     @State private var photoPage = 0
@@ -48,6 +50,15 @@ struct EventDetailView: View {
         .navigationBarHidden(true)
         // Закрываем карточку в onDismiss, а не сразу: два одновременных закрытия
         // (лист и экран) SwiftUI разыгрывает как гонку и одно из них теряется.
+        .onReceive(NotificationCenter.default.publisher(for: .userBlocked)) { note in
+            guard let id = UserBlocked.userID(from: note),
+                  event?.organizer.id == id else { return }
+            // В момент блокировки эта карточка закрыта профилем, и dismiss()
+            // ушёл бы в пустоту: закрыть можно только видимый экран. Помечаем
+            // и закрываемся, когда человек вернётся сюда.
+            organizerBlocked = true
+        }
+        .onAppear { if organizerBlocked { dismiss() } }
         .sheet(isPresented: $showEdit, onDismiss: { if deleted { dismiss() } }) {
             if let e = event {
                 EventEditView(event: e, onDeleted: { deleted = true }) { Task { await load() } }
