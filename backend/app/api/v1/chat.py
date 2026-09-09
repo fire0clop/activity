@@ -20,12 +20,17 @@ logger = logging.getLogger("chat")
 HISTORY_LIMIT = 50
 
 
-async def _send_history(websocket: WebSocket, conversation_id: uuid.UUID) -> None:
+async def _send_history(
+    websocket: WebSocket, conversation_id: uuid.UUID, viewer_id: uuid.UUID
+) -> None:
     async with SessionLocal() as db:
         rows = (
             await db.execute(
                 select(Message)
-                .where(Message.conversation_id == conversation_id)
+                .where(
+                    Message.conversation_id == conversation_id,
+                    chat_service.not_blocked_clause(viewer_id),
+                )
                 .order_by(Message.created_at.desc())
                 .limit(HISTORY_LIMIT)
             )
@@ -75,7 +80,7 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
             return
 
     await manager.connect(conversation_id, user_id, websocket, subprotocol=subprotocol)
-    await _send_history(websocket, conversation_id)
+    await _send_history(websocket, conversation_id, user_id)
     await _broadcast_presence(conversation_id)
 
     try:
@@ -105,8 +110,8 @@ async def chat_ws(websocket: WebSocket, conversation_id: uuid.UUID, token: str =
                         )
                         continue
                     if content_filter.is_objectionable(text):
-                        await ws.send_json({"type": "error", "code": "objectionable_content",
-                                            "message": "Сообщение нарушает правила сообщества"})
+                        await websocket.send_json({"type": "error", "code": "objectionable_content",
+                                                   "message": "Сообщение нарушает правила сообщества"})
                         continue
                     await chat_service.post_message(db2, conversation_id, text, sender_id=user_id)
             elif mtype == "typing":

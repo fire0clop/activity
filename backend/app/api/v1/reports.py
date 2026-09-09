@@ -23,6 +23,7 @@ async def create_report(
         reporter_id=current_user.id,
         target_user_id=body.target_user_id,
         target_event_id=body.target_event_id,
+        target_message_id=body.target_message_id,
         reason=body.reason,
         comment=body.comment,
         status="new",

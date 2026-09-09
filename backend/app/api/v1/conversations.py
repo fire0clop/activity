@@ -291,7 +291,10 @@ async def get_messages(
     rows = (
         await db.execute(
             select(Message)
-            .where(Message.conversation_id == conversation_id)
+            .where(
+                Message.conversation_id == conversation_id,
+                chat_service.not_blocked_clause(current_user.id),
+            )
             .order_by(Message.created_at.desc())
             .offset(offset)
             .limit(limit + 1)

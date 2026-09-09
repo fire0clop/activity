@@ -41,6 +41,7 @@ class ReviewsOut(BaseModel):
 class ReportCreateIn(BaseModel):
     target_user_id: uuid.UUID | None = None
     target_event_id: uuid.UUID | None = None
+    target_message_id: uuid.UUID | None = None
     reason: str = Field(..., pattern="^(spam|inappropriate|safety|other)$")
     comment: str | None = None
 

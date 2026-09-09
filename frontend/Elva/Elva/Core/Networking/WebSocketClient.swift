@@ -88,8 +88,24 @@ final class WebSocketClient: NSObject, ObservableObject {
     /// чтобы последующие WS-сообщения не задваивались.
     func applyRESTHistory(_ items: [Message]) {
         guard messages.isEmpty else { return }
-        messages = items
-        messageIDs = Set(items.map { $0.id })
+        messages = items.filter { !isSuppressed($0) }
+        messageIDs = Set(messages.map { $0.id })
+    }
+
+    /// Отправители, чьи сообщения не показываем (пользователь их заблокировал).
+    /// Сервер отфильтрует историю при следующем подключении; здесь — мгновенная
+    /// реакция открытого экрана (App Store 1.2: контент исчезает сразу).
+    private var suppressedSenderIDs: Set<String> = []
+
+    func suppressSender(_ userID: String) {
+        suppressedSenderIDs.insert(userID)
+        messages.removeAll { $0.sender?.id == userID }
+        messageIDs = Set(messages.map { $0.id })
+    }
+
+    private func isSuppressed(_ m: Message) -> Bool {
+        guard let senderID = m.sender?.id else { return false }
+        return suppressedSenderIDs.contains(senderID)
     }
 
     /// Привязываем чтение к КОНКРЕТНОМУ сокету: колбэки уже заменённого соединения
@@ -118,11 +134,11 @@ final class WebSocketClient: NSObject, ObservableObject {
               let env = try? decoder.decode(Envelope.self, from: data) else { return }
         switch env.type {
         case "history":
-            let msgs = env.messages ?? []
+            let msgs = (env.messages ?? []).filter { !isSuppressed($0) }
             messages = msgs
             messageIDs = Set(msgs.map { $0.id })
         case "message", "system":
-            if let m = env.message, !messageIDs.contains(m.id) {
+            if let m = env.message, !messageIDs.contains(m.id), !isSuppressed(m) {
                 messageIDs.insert(m.id)
                 messages.append(m)
             }

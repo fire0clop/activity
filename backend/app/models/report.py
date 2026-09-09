@@ -18,6 +18,11 @@ class Report(Base, UUIDPrimaryKey, TimestampMixin):
     target_event_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("events.id", ondelete="CASCADE"), nullable=True
     )
+    # Жалоба на конкретное сообщение в чате (App Store 1.2: flag objectionable content).
+    # SET NULL: сама жалоба переживает удаление сообщения — модерации важен факт.
+    target_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
     # reason: spam | inappropriate | safety | other
     reason: Mapped[str] = mapped_column(String(32), nullable=False)
     comment: Mapped[str | None] = mapped_column(String, nullable=True)

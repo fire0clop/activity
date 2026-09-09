@@ -1,13 +1,14 @@
 import logging
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conversation import Conversation, ConversationMember
 from app.models.event import Event
 from app.models.message import Message
+from app.models.report import Block
 from app.models.user import User
 from app.schemas.message import MessageOut
 from app.schemas.user import UserPublic
@@ -39,6 +40,24 @@ async def get_or_create_event_conversation(db: AsyncSession, event: Event) -> Co
     # организатор — владелец беседы
     db.add(ConversationMember(conversation_id=conv.id, user_id=event.organizer_id, role="owner"))
     return conv
+
+
+def not_blocked_clause(viewer_id: uuid.UUID):
+    """SQL-условие «сообщение не от пользователя, которого читатель заблокировал».
+
+    App Store 1.2: контент заблокированного не должен показываться, включая переписку.
+    Системные сообщения (sender_id IS NULL) проходят всегда.
+    """
+    blocked = select(Block.blocked_id).where(Block.blocker_id == viewer_id).scalar_subquery()
+    return or_(Message.sender_id.is_(None), Message.sender_id.not_in(blocked))
+
+
+async def blocker_ids_of(db: AsyncSession, user_id: uuid.UUID) -> list[uuid.UUID]:
+    """Кто заблокировал этого пользователя — им не доставляем его живые сообщения."""
+    rows = (
+        await db.execute(select(Block.blocker_id).where(Block.blocked_id == user_id))
+    ).scalars().all()
+    return list(rows)
 
 
 async def ensure_member(db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -124,9 +143,13 @@ async def post_message(
     await db.refresh(msg)
 
     out = await serialize_message(db, msg)
+    # Тем, кто заблокировал отправителя, живое сообщение не доставляем —
+    # история для них отфильтрована, рассылка должна вести себя так же.
+    exclude = await blocker_ids_of(db, sender_id) if sender_id is not None else []
     await manager.broadcast(
         conversation_id,
         {"type": "system" if is_system else "message", "message": out.model_dump(mode="json")},
+        exclude_user_ids=exclude,
     )
     if not is_system and sender_id is not None:
         try:

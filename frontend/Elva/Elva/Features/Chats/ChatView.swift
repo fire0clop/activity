@@ -11,6 +11,10 @@ struct ChatView: View {
     @StateObject private var ws = WebSocketClient()
     @State private var draft = ""
     @State private var historyError: String?
+    // Модерация переписки (App Store 1.2): жалоба на сообщение и блокировка автора.
+    @State private var reportTarget: Message?
+    @State private var blockTarget: Message?
+    @State private var noticeText: String?
 
     private var canSend: Bool {
         ws.connected && !draft.trimmingCharacters(in: .whitespaces).isEmpty
@@ -56,6 +60,39 @@ struct ChatView: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            "Пожаловаться на сообщение", isPresented: .init(
+                get: { reportTarget != nil }, set: { if !$0 { reportTarget = nil } }
+            ), titleVisibility: .visible
+        ) {
+            Button("Спам") { Task { await reportMessage("spam") } }
+            Button("Неуместное содержание") { Task { await reportMessage("inappropriate") } }
+            Button("Безопасность") { Task { await reportMessage("safety") } }
+            Button("Другое") { Task { await reportMessage("other") } }
+        }
+        .alert(
+            "Заблокировать пользователя?", isPresented: .init(
+                get: { blockTarget != nil }, set: { if !$0 { blockTarget = nil } }
+            )
+        ) {
+            Button("Заблокировать", role: .destructive) { Task { await blockSender() } }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Его сообщения и события перестанут вам показываться.")
+        }
+        .overlay(alignment: .top) {
+            if let noticeText {
+                Text(noticeText).font(.footnote)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Theme.surface).clipShape(Capsule())
+                    .overlay(Capsule().stroke(Theme.line))
+                    .padding(.top, 6)
+                    .transition(.opacity)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .userBlocked)) { note in
+            if let id = UserBlocked.userID(from: note) { ws.suppressSender(id) }
         }
         .onAppear {
             ws.connect(conversationID: conversationID) { [weak auth] in
@@ -172,8 +209,76 @@ struct ChatView: View {
                     .background(Theme.surface)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.line))
+                    // Долгое нажатие — привычный жест; кнопка «⋯» рядом дублирует его
+                    // видимым элементом (App Store 1.2: механизм жалоб должен находиться).
+                    .contextMenu { moderationMenu(for: m) }
             }
+            moderationButton(for: m)
             Spacer(minLength: 40)
+        }
+    }
+
+    // MARK: - Модерация сообщений (жалоба / блокировка — App Store 1.2)
+
+    @ViewBuilder
+    private func moderationMenu(for m: Message) -> some View {
+        if let sender = m.sender {
+            NavigationLink { PublicProfileView(userID: sender.id) } label: {
+                Label("Профиль", systemImage: "person.crop.circle")
+            }
+            Button { reportTarget = m } label: {
+                Label("Пожаловаться", systemImage: "exclamationmark.bubble")
+            }
+            Button(role: .destructive) { blockTarget = m } label: {
+                Label("Заблокировать пользователя", systemImage: "hand.raised")
+            }
+        }
+    }
+
+    private func moderationButton(for m: Message) -> some View {
+        Menu {
+            moderationMenu(for: m)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+                .frame(width: 26, height: 26)
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Действия с сообщением")
+    }
+
+    private func showNotice(_ text: String) {
+        withAnimation { noticeText = text }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            withAnimation { noticeText = nil }
+        }
+    }
+
+    private func reportMessage(_ reason: String) async {
+        guard let m = reportTarget else { return }
+        reportTarget = nil
+        do {
+            try await auth.api.sendVoid(Endpoint(
+                path: "/reports", method: .post,
+                body: ReportBody(target_user_id: m.sender?.id, target_message_id: m.id,
+                                 reason: reason)))
+            showNotice("Жалоба отправлена. Спасибо.")
+        } catch {
+            showNotice("Не удалось отправить жалобу. Проверьте соединение.")
+        }
+    }
+
+    private func blockSender() async {
+        guard let userID = blockTarget?.sender?.id else { return }
+        blockTarget = nil
+        do {
+            try await auth.api.sendVoid(Endpoint(path: "/users/\(userID)/block", method: .post))
+            UserBlocked.post(userID: userID)
+            showNotice("Пользователь заблокирован.")
+        } catch {
+            showNotice("Не удалось заблокировать. Проверьте соединение.")
         }
     }
 }
