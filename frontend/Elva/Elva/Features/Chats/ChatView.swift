@@ -13,7 +13,9 @@ struct ChatView: View {
     @State private var historyError: String?
     // Модерация переписки (App Store 1.2): жалоба на сообщение и блокировка автора.
     @State private var reportTarget: Message?
+    @State private var showReportDialog = false
     @State private var blockTarget: Message?
+    @State private var showBlockAlert = false
     @State private var noticeText: String?
 
     private var canSend: Bool {
@@ -61,24 +63,27 @@ struct ChatView: View {
                 }
             }
         }
+        // presenting: передаёт сообщение в замыкания кнопок напрямую — читать
+        // @State в действии нельзя: к этому моменту диалог уже закрыт и state обнулён.
         .confirmationDialog(
-            "Пожаловаться на сообщение", isPresented: .init(
-                get: { reportTarget != nil }, set: { if !$0 { reportTarget = nil } }
-            ), titleVisibility: .visible
-        ) {
-            Button("Спам") { Task { await reportMessage("spam") } }
-            Button("Неуместное содержание") { Task { await reportMessage("inappropriate") } }
-            Button("Безопасность") { Task { await reportMessage("safety") } }
-            Button("Другое") { Task { await reportMessage("other") } }
+            "Пожаловаться на сообщение",
+            isPresented: $showReportDialog,
+            titleVisibility: .visible,
+            presenting: reportTarget
+        ) { m in
+            Button("Спам") { Task { await reportMessage(m, reason: "spam") } }
+            Button("Неуместное содержание") { Task { await reportMessage(m, reason: "inappropriate") } }
+            Button("Безопасность") { Task { await reportMessage(m, reason: "safety") } }
+            Button("Другое") { Task { await reportMessage(m, reason: "other") } }
         }
         .alert(
-            "Заблокировать пользователя?", isPresented: .init(
-                get: { blockTarget != nil }, set: { if !$0 { blockTarget = nil } }
-            )
-        ) {
-            Button("Заблокировать", role: .destructive) { Task { await blockSender() } }
+            "Заблокировать пользователя?",
+            isPresented: $showBlockAlert,
+            presenting: blockTarget
+        ) { m in
+            Button("Заблокировать", role: .destructive) { Task { await blockSender(of: m) } }
             Button("Отмена", role: .cancel) {}
-        } message: {
+        } message: { _ in
             Text("Его сообщения и события перестанут вам показываться.")
         }
         .overlay(alignment: .top) {
@@ -226,10 +231,10 @@ struct ChatView: View {
             NavigationLink { PublicProfileView(userID: sender.id) } label: {
                 Label("Профиль", systemImage: "person.crop.circle")
             }
-            Button { reportTarget = m } label: {
+            Button { reportTarget = m; showReportDialog = true } label: {
                 Label("Пожаловаться", systemImage: "exclamationmark.bubble")
             }
-            Button(role: .destructive) { blockTarget = m } label: {
+            Button(role: .destructive) { blockTarget = m; showBlockAlert = true } label: {
                 Label("Заблокировать пользователя", systemImage: "hand.raised")
             }
         }
@@ -256,9 +261,7 @@ struct ChatView: View {
         }
     }
 
-    private func reportMessage(_ reason: String) async {
-        guard let m = reportTarget else { return }
-        reportTarget = nil
+    private func reportMessage(_ m: Message, reason: String) async {
         do {
             try await auth.api.sendVoid(Endpoint(
                 path: "/reports", method: .post,
@@ -270,9 +273,8 @@ struct ChatView: View {
         }
     }
 
-    private func blockSender() async {
-        guard let userID = blockTarget?.sender?.id else { return }
-        blockTarget = nil
+    private func blockSender(of m: Message) async {
+        guard let userID = m.sender?.id else { return }
         do {
             try await auth.api.sendVoid(Endpoint(path: "/users/\(userID)/block", method: .post))
             UserBlocked.post(userID: userID)
