@@ -88,3 +88,42 @@ struct TermsGateView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
+
+/// Чекбокс согласия с правилами на экранах входа и регистрации (App Store 1.2):
+/// продолжить нельзя, пока согласие не дано; ссылка ведёт на полный текст.
+/// Согласие едино с TermsGateView — принятые на гейте правила отмечают чекбокс,
+/// поэтому существующих пользователей он не тормозит.
+struct TermsConsentRow: View {
+    @Binding var agreed: Bool
+    @AppStorage(Terms.storageKey) private var tosAccepted = ""
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Button {
+                Haptics.tap()
+                agreed.toggle()
+                // Пишем только согласие: снятие галочки блокирует кнопки локально,
+                // но не сбрасывает принятие на гейте (иначе RootView вернул бы гейт).
+                if agreed { tosAccepted = Terms.version }
+            } label: {
+                Image(systemName: agreed ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 22))
+                    .foregroundStyle(agreed ? Theme.accent : Theme.ink2)
+            }
+            .accessibilityLabel("Согласие с правилами сообщества")
+            .accessibilityValue(agreed ? "принято" : "не принято")
+
+            (Text("Принимаю ")
+                + Text("правила сообщества").underline().foregroundColor(Theme.accentInk)
+                + Text(" — нулевая терпимость к оскорбительному контенту"))
+                .font(.footnote)
+                .foregroundStyle(Theme.ink2)
+                .onTapGesture { UIApplication.shared.open(Terms.fullTextURL) }
+
+            Spacer(minLength: 0)
+        }
+        .onAppear {
+            if tosAccepted == Terms.version { agreed = true }
+        }
+    }
+}

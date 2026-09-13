@@ -8,8 +8,10 @@ struct LoginView: View {
     @State private var password = ""
     @State private var isLoading = false
     @State private var errorText: String?
+    /// Согласие с правилами (App Store 1.2): без него вход недоступен.
+    @State private var termsAgreed = false
 
-    private var isValid: Bool { phone.count >= 11 && password.count >= 6 }
+    private var isValid: Bool { phone.count >= 11 && password.count >= 6 && termsAgreed }
 
     var body: some View {
         NavigationStack {
@@ -40,6 +42,8 @@ struct LoginView: View {
                     }
                 }
 
+                TermsConsentRow(agreed: $termsAgreed)
+
                 PrimaryButton(title: "Войти", isLoading: isLoading, isEnabled: isValid) {
                     Task { await login() }
                 }
@@ -56,6 +60,8 @@ struct LoginView: View {
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+                .disabled(!termsAgreed)
+                .opacity(termsAgreed ? 1 : 0.45)
 
                 HStack {
                     NavigationLink("Регистрация") { RegisterView() }
