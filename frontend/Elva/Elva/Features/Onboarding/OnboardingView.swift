@@ -74,6 +74,15 @@ struct OnboardingView: View {
             .onChange(of: pickerItem) { _, item in
                 Task { await loadImage(item) }
             }
+            // Guideline 4 (Sign in with Apple): имя, полученное от Apple при входе,
+            // уже сохранено на сервере — не заставляем вводить его заново,
+            // а подставляем. Пользователь может поправить, но обязан лишь добавить
+            // фото и «о себе».
+            .onAppear {
+                if name.isEmpty, let saved = auth.me?.name, !saved.isEmpty {
+                    name = saved
+                }
+            }
         }
     }
 

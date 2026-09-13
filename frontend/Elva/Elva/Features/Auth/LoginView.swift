@@ -47,7 +47,9 @@ struct LoginView: View {
                 orDivider
 
                 SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.fullName, .email]
+                    // Только имя: e-mail приложение не использует и не хранит,
+                    // лишний запрос данных — повод для вопросов на ревью (Guideline 4).
+                    request.requestedScopes = [.fullName]
                 } onCompletion: { result in
                     Task { await handleApple(result) }
                 }
